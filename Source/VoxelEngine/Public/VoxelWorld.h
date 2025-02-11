@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Voxel.h"
+#include "VoxelChunk.h"
 #include "VoxelWorld.generated.h"
 
 UCLASS()
@@ -13,13 +14,20 @@ class VOXELENGINE_API AVoxelWorld : public AActor
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	AVoxelWorld();
-	// Called every frame
+
+	UFUNCTION(BlueprintCallable)
+	void DrawChunkWireframes(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable)
+	void DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled);
+
 	virtual void Tick(float DeltaTime) override;
 
-	int32 LinearizeCoordinate(int32 X, int32 Y, int32 Z);
-	FIntVector DelinearizeCoordinate(int32 LinearCoord);
+	int32 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
+	FIntVector DelinearizeCoordinate(int32 LinearCoord) const;
+
+	const Voxel& GetVoxel(const FIntVector& Coord) const;
 
 	Voxel& GetVoxel(const FIntVector& Coord);
 
@@ -36,6 +44,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	double GetVoxelSizeWorld() const;
+	
+	UFUNCTION(BlueprintCallable)
+	bool IsVoxelTransparent(const FIntVector& Coord) const;
+
+	UFUNCTION(BlueprintCallable)
+	UMaterialInterface* GetVoxelChunkMaterial() const;
 
 protected:
 	// Called when the game starts or when spawned
@@ -43,7 +57,7 @@ protected:
 
 private:
 	UPROPERTY(EditDefaultsOnly)
-	FIntVector2 ChunkWorldDimensions = FIntVector2(32, 32);
+	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
 
 	UPROPERTY(EditDefaultsOnly)
 	int32 ChunkSide = 16;
@@ -54,5 +68,12 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	double VoxelSizeWorld = 100;
 
+	UPROPERTY(EditDefaultsOnly)
+	UMaterialInterface* VoxelChunkMaterial = nullptr;
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<UVoxelChunk*> Chunks;
+
 	TArray<Voxel> Voxels;
+
 };

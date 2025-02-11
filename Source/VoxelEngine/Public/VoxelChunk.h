@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "Components/SceneComponent.h"
+#include "DynamicMesh/DynamicMesh3.h"
+#include "Components/DynamicMeshComponent.h"
 #include "VoxelChunk.generated.h"
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class VOXELENGINE_API UVoxelChunk : public UActorComponent
+class VOXELENGINE_API UVoxelChunk : public USceneComponent
 {
 	GENERATED_BODY()
 
@@ -29,6 +31,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	FBox GetWorldBoundingBox() const;
 
+	UFUNCTION(BlueprintCallable)
+	void GetVoxelBoundingBox(FIntVector& OutMin, FIntVector& OutMax) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetDrawWireframe(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable)
+	bool GetDrawWireframe() const;
+
 protected:
 	// Called when the game starts
 	void BeginPlay() override;
@@ -40,5 +51,15 @@ private:
 	int32 ChunkY = 0;
 
 	UPROPERTY(EditAnywhere)
-	bool bDebugDrawDimensions = true;
+	bool bDebugDrawDimensions = false;
+
+	UPROPERTY(VisibleAnywhere)
+	UDynamicMeshComponent* DynamicMeshComponent;
+
+	void GenerateMesh();
+	void ProcessVoxels();
+	void ProcessVoxel(int32 X, int32 Y, int32 Z);
+	bool IsFaceVisible(int32 X, int32 Y, int32 Z) const;
+	void AddFaceData(int32 X, int32 Y, int32 Z, int FaceIndex);
+	void AddTriangleIndices();
 };

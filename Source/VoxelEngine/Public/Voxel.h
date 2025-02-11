@@ -11,5 +11,5 @@
 class VOXELENGINE_API Voxel
 {
 public:
-	EVoxelType VoxelType = EVoxelType::None;
+	EVoxelType VoxelType = EVoxelType::Dirt;
 };
