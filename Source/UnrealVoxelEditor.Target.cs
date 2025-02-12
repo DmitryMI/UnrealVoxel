@@ -12,5 +12,6 @@ public class UnrealVoxelEditorTarget : TargetRules
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 		ExtraModuleNames.Add("UnrealVoxel");
         ExtraModuleNames.Add("VoxelEngine");
+        ExtraModuleNames.Add("VoxelEngineEditor");
     }
 }
