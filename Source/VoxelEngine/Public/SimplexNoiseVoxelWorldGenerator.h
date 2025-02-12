@@ -26,6 +26,12 @@ private:
 	int32 TerrainAverageHeight = 8;
 
 	UPROPERTY(EditDefaultsOnly)
+	int32 GrassThickness = 1;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 DirthThickness = 2;
+
+	UPROPERTY(EditDefaultsOnly)
 	int32 HeightAmplitude = 8;
 
 	UPROPERTY(EditDefaultsOnly)

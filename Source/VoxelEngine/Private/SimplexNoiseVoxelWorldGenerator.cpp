@@ -25,7 +25,18 @@ void USimplexNoiseVoxelWorldGenerator::GenerateWorld(AVoxelWorld* VoxelWorld, co
                 Voxel& Voxel = VoxelWorld->GetVoxel(VoxelCoord);
                 float NoiseValue = USimplexNoise::Noise(WorldPos.X * NoiseScale, WorldPos.Y * NoiseScale);
                 int32 Height = TerrainAverageHeight + NoiseValue * HeightAmplitude;
-                if (Z < Height)
+                int32 DirtLowest = Height - GrassThickness - DirthThickness;
+                int32 GrassLowest = Height - GrassThickness;
+
+                if (Z <= DirtLowest)
+                {
+                    Voxel.VoxelType = EVoxelType::Stone;
+                }
+                else if (Z < GrassLowest)
+                {
+                    Voxel.VoxelType = EVoxelType::Dirt;
+                }
+                else if (Z <= Height)
                 {
                     Voxel.VoxelType = EVoxelType::Grass;
                 }
