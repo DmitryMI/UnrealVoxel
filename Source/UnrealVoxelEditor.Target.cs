@@ -11,5 +11,6 @@ public class UnrealVoxelEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V5;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 		ExtraModuleNames.Add("UnrealVoxel");
+        ExtraModuleNames.Add("VoxelEngine");
     }
 }

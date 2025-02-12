@@ -104,8 +104,11 @@ void UVoxelChunk::ProcessVoxel(int32 X, int32 Y, int32 Z)
 	checkSlow(CoordTranslated.X <= ChunkMax.X);
 	checkSlow(CoordTranslated.Y <= ChunkMax.Y);
 	checkSlow(CoordTranslated.Z <= ChunkMax.Z);
-	
-	Voxel& Voxel = VoxelWorld->GetVoxel(CoordTranslated);
+
+	if (VoxelWorld->IsVoxelTransparent(CoordTranslated))
+	{
+		return;
+	}
 
 	TArray<bool, TFixedAllocator<6>> FacesVisibility;
 	FacesVisibility.SetNumUninitialized(6);

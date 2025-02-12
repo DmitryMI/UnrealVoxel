@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "Voxel.h"
 #include "VoxelChunk.h"
+#include "VoxelWorldGenerator.h"
+#include <vector>
 #include "VoxelWorld.generated.h"
 
 UCLASS()
@@ -22,9 +24,33 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled);
 
+	UFUNCTION(BlueprintCallable)
+	FIntVector GetWorldSizeVoxel() const;
+
+	UFUNCTION(BlueprintCallable)
+	void GetChunkWorldDimensions(int32& OutX, int32& OutY) const;
+
+	UFUNCTION(BlueprintCallable)
+	int32 GetChunkSide() const;
+
+	UFUNCTION(BlueprintCallable)
+	int32 GetWorldHeight() const;
+
+	UFUNCTION(BlueprintCallable)
+	double GetVoxelSizeWorld() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool IsVoxelTransparent(const FIntVector& Coord) const;
+
+	UFUNCTION(BlueprintCallable)
+	UMaterialInterface* GetVoxelChunkMaterial() const;
+
+	UFUNCTION(BlueprintCallable)
+	FVector GetVoxelCenterWorld(const FIntVector& Coord) const;
+
 	virtual void Tick(float DeltaTime) override;
 
-	int32 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
+	uint64 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
 	FIntVector DelinearizeCoordinate(int32 LinearCoord) const;
 
 	const Voxel& GetVoxel(const FIntVector& Coord) const;
@@ -33,32 +59,11 @@ public:
 
 	Voxel& GetVoxel(int32 X, int32 Y, int32 Z);
 
-	UFUNCTION(BlueprintCallable)
-	void GetChunkWorldDimensions(int32& OutX, int32& OutY) const;
-	
-	UFUNCTION(BlueprintCallable)
-	int32 GetChunkSide() const;
-	
-	UFUNCTION(BlueprintCallable)
-	int32 GetWorldHeight() const;
-
-	UFUNCTION(BlueprintCallable)
-	double GetVoxelSizeWorld() const;
-	
-	UFUNCTION(BlueprintCallable)
-	bool IsVoxelTransparent(const FIntVector& Coord) const;
-
-	UFUNCTION(BlueprintCallable)
-	UMaterialInterface* GetVoxelChunkMaterial() const;
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 private:
-	UPROPERTY(EditDefaultsOnly)
-	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
-
 	UPROPERTY(EditDefaultsOnly)
 	int32 ChunkSide = 16;
 
@@ -69,11 +74,23 @@ private:
 	double VoxelSizeWorld = 100;
 
 	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UVoxelWorldGenerator> VoxelWorldGeneratorClass;
+
+	UPROPERTY(EditDefaultsOnly)
 	UMaterialInterface* VoxelChunkMaterial = nullptr;
+
+	UPROPERTY(VisibleAnywhere)
+	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
 
 	UPROPERTY(VisibleAnywhere)
 	TArray<UVoxelChunk*> Chunks;
 
-	TArray<Voxel> Voxels;
+	UPROPERTY()
+	UVoxelWorldGenerator* VoxelWorldGeneratorInstance;
+
+	UFUNCTION()
+	void WorldGenerationFinishedCallback();
+
+	std::vector<Voxel> Voxels;
 
 };

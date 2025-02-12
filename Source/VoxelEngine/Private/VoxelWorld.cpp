@@ -3,13 +3,13 @@
 
 #include "VoxelWorld.h"
 #include "Misc/DateTime.h"
+#include "SimplexNoise.h"
 
 // Sets default values
 AVoxelWorld::AVoxelWorld()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
 }
 
 void AVoxelWorld::DrawChunkWireframes(bool bEnabled)
@@ -32,18 +32,56 @@ void AVoxelWorld::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled)
 	Chunks[ChunkIndex]->SetDrawWireframe(bEnabled);
 }
 
+FIntVector AVoxelWorld::GetWorldSizeVoxel() const
+{
+	return FIntVector(ChunkWorldDimensions.X * ChunkSide, ChunkWorldDimensions.Y * ChunkSide, WorldHeight);
+}
+
 // Called when the game starts or when spawned
 void AVoxelWorld::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (!VoxelWorldGeneratorClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel World Generator class not set!"));
+		return;
+	}
+
+	VoxelWorldGeneratorInstance = NewObject<UVoxelWorldGenerator>(this, VoxelWorldGeneratorClass, FName("VoxelWorldGeneratorInstance"));
+	check(VoxelWorldGeneratorInstance);
+
+	FIntVector2 GeneratorWantsSize = VoxelWorldGeneratorInstance->GetWantedWorldSizeVoxels();
+	int32 ChunksX = GeneratorWantsSize.X / ChunkSide;
+	int32 ChunksY = GeneratorWantsSize.Y / ChunkSide;
+	if (GeneratorWantsSize.X % ChunkSide != 0)
+	{
+		ChunksX += 1;
+	}
+	if (GeneratorWantsSize.Y % ChunkSide != 0)
+	{
+		ChunksY += 1;
+	}
+	ChunkWorldDimensions = FIntVector2(ChunksX, ChunksY);
+
 	UE_LOG(LogTemp, Display, TEXT("Allocating Voxel World memory..."));
 	FDateTime AllocStartTime = FDateTime::Now();
-	Voxels.SetNum(ChunkWorldDimensions.X * ChunkSide * ChunkWorldDimensions.Y * ChunkSide *  WorldHeight * ChunkSide);
+	size_t Length = ChunkWorldDimensions.X * ChunkSide;
+	size_t Width = ChunkWorldDimensions.Y * ChunkSide;
+	size_t Height = WorldHeight;
+	size_t VoxelsNum = Length * Width * Height;
+	Voxels.resize(VoxelsNum);
 	FDateTime AllocEndTime = FDateTime::Now();
 	FTimespan AllocElapsedTime = AllocEndTime - AllocStartTime;
-	UE_LOG(LogTemp, Display, TEXT("Voxel World memory allocated, %d voxels in total, %3.2f milliseconds"), Voxels.Num(), AllocElapsedTime.GetTotalMilliseconds());
+	UE_LOG(LogTemp, Display, TEXT("Voxel World memory allocated, %d voxels in total, %3.2f milliseconds"), Voxels.size(), AllocElapsedTime.GetTotalMilliseconds());
 
+	UVoxelWorldGenerator::FVoxelWorlGenerationFinished Callback;
+	Callback.BindUFunction(this, FName("WorldGenerationFinishedCallback"));
+	VoxelWorldGeneratorInstance->GenerateWorld(this, Callback);
+}
+
+void AVoxelWorld::WorldGenerationFinishedCallback()
+{
 	UE_LOG(LogTemp, Display, TEXT("Spawning Chunk components..."));
 	FDateTime ChunkSpawnStartTime = FDateTime::Now();
 	for (int32 X = 0; X < ChunkWorldDimensions.X; X++)
@@ -53,7 +91,7 @@ void AVoxelWorld::BeginPlay()
 			UVoxelChunk* Chunk = NewObject<UVoxelChunk>(this);
 			check(Chunk);
 			Chunk->SetChunkIndex(X, Y);
-			
+
 			Chunk->RegisterComponent();
 			FAttachmentTransformRules Rules(EAttachmentRule::KeepRelative, false);
 			Chunk->AttachToComponent(RootComponent, Rules);
@@ -73,13 +111,17 @@ void AVoxelWorld::Tick(float DeltaTime)
 
 }
 
-int32 AVoxelWorld::LinearizeCoordinate(int32 X, int32 Y, int32 Z) const
+uint64 AVoxelWorld::LinearizeCoordinate(int32 X, int32 Y, int32 Z) const
 {
 	checkSlow(0 <= X && X <= ChunkWorldDimensions.X * ChunkSide);
 	checkSlow(0 <= Y && Y <= ChunkWorldDimensions.Y * ChunkSide);
 	checkSlow(0 <= Z && Z <= WorldHeight);
-	int32 Result = Z * ((ChunkWorldDimensions.X * ChunkSide) * (ChunkWorldDimensions.Y * ChunkSide)) + Y * (ChunkWorldDimensions.X * ChunkSide) + X;
-	check(Result < Voxels.Num());
+
+	uint64 Result = 
+		static_cast<size_t>(Z * ChunkWorldDimensions.X * ChunkSide * ChunkWorldDimensions.Y * ChunkSide) +
+		static_cast<size_t>(Y * (ChunkWorldDimensions.X * ChunkSide)) +
+		static_cast<size_t>(X);
+	check(Result < Voxels.size());
 	return Result;
 }
 
@@ -152,5 +194,10 @@ bool AVoxelWorld::IsVoxelTransparent(const FIntVector& Coord) const
 UMaterialInterface* AVoxelWorld::GetVoxelChunkMaterial() const
 {
 	return VoxelChunkMaterial;
+}
+
+FVector AVoxelWorld::GetVoxelCenterWorld(const FIntVector& Coord) const
+{
+	return GetActorLocation() + VoxelSizeWorld * FVector(Coord.X, Coord.Y, Coord.Z) * 1.5;
 }
 

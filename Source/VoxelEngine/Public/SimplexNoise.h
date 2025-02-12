@@ -41,7 +41,7 @@ private:
 
     static constexpr inline uint8 Hash(int32_t I) 
     {
-        return Perm[I];
+        return Perm[I & 0xff];
     }
 
     static constexpr float Grad(int32 Hash, float X)
@@ -161,13 +161,13 @@ public:
         }
 
         // Calculate the contribution from the second corner
-        float t1 = 0.5f - X1 * X1 - Y1 * Y1;
-        if (t1 < 0.0f) {
+        float T1 = 0.5f - X1 * X1 - Y1 * Y1;
+        if (T1 < 0.0f) {
             N1 = 0.0f;
         }
         else {
-            t1 *= t1;
-            N1 = t1 * t1 * Grad(Gi1, X1, Y1);
+            T1 *= T1;
+            N1 = T1 * T1 * Grad(Gi1, X1, Y1);
         }
 
         // Calculate the contribution from the third corner
@@ -255,13 +255,13 @@ public:
         int Gi3 = Hash(I + 1 + Hash(J + 1 + Hash(K + 1)));
 
         // Calculate the contribution from the four corners
-        float t0 = 0.6f - XShift0 * XShift0 - YShift0 * YShift0 - ZShift0 * ZShift0;
-        if (t0 < 0) {
+        float T0 = 0.6f - XShift0 * XShift0 - YShift0 * YShift0 - ZShift0 * ZShift0;
+        if (T0 < 0) {
             N0 = 0.0;
         }
         else {
-            t0 *= t0;
-            N0 = t0 * t0 * Grad(Gi0, XShift0, YShift0, ZShift0);
+            T0 *= T0;
+            N0 = T0 * T0 * Grad(Gi0, XShift0, YShift0, ZShift0);
         }
         float T1 = 0.6f - X1 * X1 - Y1 * Y1 - Z1 * Z1;
         if (T1 < 0) {
@@ -318,7 +318,7 @@ public:
         float FrequencyTemp = Frequency;
         float AmplitudeTemp = Amplitude;
 
-        for (size_t i = 0; i < Octaves; i++) {
+        for (size_t I = 0; I < Octaves; I++) {
             Output += (AmplitudeTemp * Noise(X * FrequencyTemp, Y * FrequencyTemp));
             Denom += AmplitudeTemp;
 
@@ -336,7 +336,7 @@ public:
         float FrequencyTemp = Frequency;
         float AmplitudeTemp = Amplitude;
 
-        for (size_t i = 0; i < Octaves; i++) {
+        for (size_t I = 0; I < Octaves; I++) {
             Output += (AmplitudeTemp * Noise(X * FrequencyTemp, Y * FrequencyTemp, Z * FrequencyTemp));
             Denom += AmplitudeTemp;
 
