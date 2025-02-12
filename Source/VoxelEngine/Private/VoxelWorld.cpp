@@ -4,6 +4,7 @@
 #include "VoxelWorld.h"
 #include "Misc/DateTime.h"
 #include "SimplexNoise.h"
+#include "VoxelEngine/VoxelEngine.h"
 
 // Sets default values
 AVoxelWorld::AVoxelWorld()
@@ -24,7 +25,7 @@ void AVoxelWorld::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled)
 {
 	if (0 > ChunkX || ChunkX >= ChunkWorldDimensions.X || 0 > ChunkY || ChunkY >= ChunkWorldDimensions.Y)
 	{
-		UE_LOG(LogTemp, Error, TEXT("DrawChunkWireframe failed: invalid chunk index (%d, %d)"), ChunkX, ChunkY);
+		UE_LOG(LogVoxelEngine, Error, TEXT("DrawChunkWireframe failed: invalid chunk index (%d, %d)"), ChunkX, ChunkY);
 		return;
 	}
 
@@ -44,7 +45,7 @@ void AVoxelWorld::BeginPlay()
 
 	if (!VoxelWorldGeneratorClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Voxel World Generator class not set!"));
+		UE_LOG(LogVoxelEngine, Error, TEXT("Voxel World Generator class not set!"));
 		return;
 	}
 
@@ -64,7 +65,7 @@ void AVoxelWorld::BeginPlay()
 	}
 	ChunkWorldDimensions = FIntVector2(ChunksX, ChunksY);
 
-	UE_LOG(LogTemp, Display, TEXT("Allocating Voxel World memory..."));
+	UE_LOG(LogVoxelEngine, Display, TEXT("Allocating Voxel World memory..."));
 	FDateTime AllocStartTime = FDateTime::Now();
 	size_t Length = ChunkWorldDimensions.X * ChunkSide;
 	size_t Width = ChunkWorldDimensions.Y * ChunkSide;
@@ -73,7 +74,7 @@ void AVoxelWorld::BeginPlay()
 	Voxels.resize(VoxelsNum);
 	FDateTime AllocEndTime = FDateTime::Now();
 	FTimespan AllocElapsedTime = AllocEndTime - AllocStartTime;
-	UE_LOG(LogTemp, Display, TEXT("Voxel World memory allocated, %d voxels in total, %3.2f milliseconds"), Voxels.size(), AllocElapsedTime.GetTotalMilliseconds());
+	UE_LOG(LogVoxelEngine, Display, TEXT("Voxel World memory allocated, %d voxels in total, %3.2f milliseconds"), Voxels.size(), AllocElapsedTime.GetTotalMilliseconds());
 
 	UVoxelWorldGenerator::FVoxelWorlGenerationFinished Callback;
 	Callback.BindUFunction(this, FName("WorldGenerationFinishedCallback"));
@@ -82,7 +83,7 @@ void AVoxelWorld::BeginPlay()
 
 void AVoxelWorld::WorldGenerationFinishedCallback()
 {
-	UE_LOG(LogTemp, Display, TEXT("Spawning Chunk components..."));
+	UE_LOG(LogVoxelEngine, Display, TEXT("Spawning Chunk components..."));
 	FDateTime ChunkSpawnStartTime = FDateTime::Now();
 	for (int32 X = 0; X < ChunkWorldDimensions.X; X++)
 	{
@@ -101,7 +102,7 @@ void AVoxelWorld::WorldGenerationFinishedCallback()
 	}
 	FDateTime ChunkSpawnEndTime = FDateTime::Now();
 	FTimespan ChunkSpawnElapsedTime = ChunkSpawnEndTime - ChunkSpawnStartTime;
-	UE_LOG(LogTemp, Display, TEXT("Spawned %d Chunk components, %3.2f milliseconds"), ChunkWorldDimensions.X * ChunkWorldDimensions.Y, ChunkSpawnElapsedTime.GetTotalMilliseconds());
+	UE_LOG(LogVoxelEngine, Display, TEXT("Spawned %d Chunk components, %3.2f milliseconds"), ChunkWorldDimensions.X * ChunkWorldDimensions.Y, ChunkSpawnElapsedTime.GetTotalMilliseconds());
 }
 
 // Called every frame

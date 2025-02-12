@@ -17,6 +17,11 @@
 				"Engine",
 				"CoreUObject"
 			]
+		},
+		{
+			"Name": "VoxelEngineEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
 		}
 	],
 	"Plugins": [
