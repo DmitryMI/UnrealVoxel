@@ -9,5 +9,6 @@ enum class EVoxelType : uint8
     Air UMETA(DisplayName = "Air"),
     Grass UMETA(DisplayName = "Grass"),
     Dirt UMETA(DisplayName = "Dirt"),
-    Stone UMETA(DisplayName = "Stone")
+    Stone UMETA(DisplayName = "Stone"),
+    MAX UMETA(Hidden)
 };
