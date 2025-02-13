@@ -4,6 +4,8 @@
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"
 #include "UnrealEd.h"
+#include "Framework/MultiBox/MultiBoxExtender.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogVoxelEngineEditor, All, All)
 
@@ -13,4 +15,10 @@ public:
     virtual void StartupModule() override;
     virtual void ShutdownModule() override;
 
+private:
+    void AddGenerateVoxelTextureAtlasContextMenuOption();
+    void RemoveGenerateVoxelTextureAtlasContextMenuOption();
+
+    static TSharedRef<FExtender> OnExtendContentBrowserAssetSelectionMenu(const TArray<FAssetData>& SelectedAssets);
+    static void ExecuteGenerateVoxelTextureAtlas(FMenuBuilder& MenuBuilder, TArray<FAssetData> SelectedAssets);
 };

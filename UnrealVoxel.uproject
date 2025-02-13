@@ -23,7 +23,8 @@
 			"Type": "Editor",
 			"LoadingPhase": "PostEngineInit",
 			"AdditionalDependencies": [
-				"Engine"
+				"Engine",
+				"CoreUObject"
 			]
 		}
 	],

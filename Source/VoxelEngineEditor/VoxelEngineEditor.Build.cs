@@ -8,7 +8,7 @@ public class VoxelEngineEditor : ModuleRules
 	{	
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "AssetRegistry" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "AssetRegistry", "AssetTools", "ContentBrowser", "SlateCore", "Slate" });
         PrivateDependencyModuleNames.AddRange(new string[] { "VoxelEngine" });
 
     }
