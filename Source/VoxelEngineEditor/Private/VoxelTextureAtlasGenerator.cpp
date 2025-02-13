@@ -14,8 +14,7 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObje
 		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Atlas Texture is nullptr"));
 		return false;
 	}
-
-	
+		
 	const UEnum* VoxelTypeEnum = FindObject<UEnum>(ANY_PACKAGE, TEXT("EVoxelType"), true);
 	check(VoxelTypeEnum);
 

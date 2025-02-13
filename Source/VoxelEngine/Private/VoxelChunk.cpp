@@ -4,7 +4,9 @@
 #include "VoxelChunk.h"
 #include "VoxelWorld.h"
 #include "DrawDebugHelpers.h"
+#include <array>
 #include "DynamicMesh/DynamicMesh3.h"
+#include "DynamicMesh/MeshAttributeUtil.h"
 
 // Sets default values for this component's properties
 UVoxelChunk::UVoxelChunk()
@@ -48,7 +50,8 @@ void UVoxelChunk::GenerateMesh()
 	checkSlow(MeshObj);
 	FDynamicMesh3& Mesh = MeshObj->GetMeshRef();
 	Mesh.Clear();
-	Mesh.EnableVertexUVs(FVector2f(0, 1));
+	Mesh.EnableVertexUVs(FVector2f(0, 0));
+	Mesh.EnableAttributes();
 
 	ProcessVoxels();
 
@@ -65,7 +68,7 @@ void UVoxelChunk::GenerateMesh()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Dynamic Mesh failed validity check"));
 	}
-	
+	UE::Geometry::CopyVertexUVsToOverlay(Mesh, *Mesh.Attributes()->PrimaryUV());
 	DynamicMeshComponent->SetMaterial(0, VoxelWorld->GetVoxelChunkMaterial());
 	DynamicMeshComponent->NotifyMeshUpdated();
 	DynamicMeshComponent->SetEnableFlatShading(true);
@@ -110,20 +113,22 @@ void UVoxelChunk::ProcessVoxel(int32 X, int32 Y, int32 Z)
 		return;
 	}
 
+	const Voxel& Voxel = VoxelWorld->GetVoxel(X, Y, Z);
+
 	TArray<bool, TFixedAllocator<6>> FacesVisibility;
 	FacesVisibility.SetNumUninitialized(6);
-	FacesVisibility[0] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y + 1, CoordTranslated.Z); // Top
-	FacesVisibility[1] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y - 1, CoordTranslated.Z); // Bottom
-	FacesVisibility[2] = IsFaceVisible(CoordTranslated.X - 1, CoordTranslated.Y, CoordTranslated.Z); // Left
-	FacesVisibility[3] = IsFaceVisible(CoordTranslated.X + 1, CoordTranslated.Y, CoordTranslated.Z); // Right
-	FacesVisibility[4] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z + 1); // Front
-	FacesVisibility[5] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z - 1); // Back
+	FacesVisibility[0] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y + 1, CoordTranslated.Z); // Right
+	FacesVisibility[1] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y - 1, CoordTranslated.Z); // Left
+	FacesVisibility[2] = IsFaceVisible(CoordTranslated.X - 1, CoordTranslated.Y, CoordTranslated.Z); // Back
+	FacesVisibility[3] = IsFaceVisible(CoordTranslated.X + 1, CoordTranslated.Y, CoordTranslated.Z); // Front
+	FacesVisibility[4] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z + 1); // Top
+	FacesVisibility[5] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z - 1); // Bottom
 
 	for (int I = 0; I < FacesVisibility.Num(); I++)
 	{
 		if (FacesVisibility[I])
 		{
-			AddFaceData(X, Y, Z, I);
+			AddFaceData(Voxel, X, Y, Z, I);
 		}
 	}
 }
@@ -136,7 +141,7 @@ bool UVoxelChunk::IsFaceVisible(int32 X, int32 Y, int32 Z) const
 	return VoxelWorld->IsVoxelTransparent(FIntVector(X, Y, Z));
 }
 
-void UVoxelChunk::AddFaceData(int32 X, int32 Y, int32 Z, int FaceIndex)
+void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int FaceIndex)
 {
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	checkSlow(VoxelWorld);
@@ -144,78 +149,90 @@ void UVoxelChunk::AddFaceData(int32 X, int32 Y, int32 Z, int FaceIndex)
 	checkSlow(DynamicMeshComponent);
 	checkSlow(DynamicMeshComponent->GetDynamicMesh());
 	FDynamicMesh3& Mesh = DynamicMeshComponent->GetDynamicMesh()->GetMeshRef();
+	auto* UvLayer = Mesh.Attributes()->GetUVLayer(0);
+	check(UvLayer);
 
-	if (FaceIndex == 0) // Top Face
+	int32 VoxelTypeInt = static_cast<int32>(Voxel.VoxelType);
+	int32 VoxelTypeNum = static_cast<int32>(EVoxelType::MAX);
+	float UMin = static_cast<float>(FaceIndex) / 6;
+	float UMax = static_cast<float>(FaceIndex + 1) / 6;
+	float VMin = static_cast<float>(VoxelTypeInt) / VoxelTypeNum;
+	float VMax = static_cast<float>(VoxelTypeInt + 1) / VoxelTypeNum;
+
+	if (FaceIndex == 0) // Right
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X,		Y + 1, Z	) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X,		Y + 1, Z + 1) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X + 1, Y + 1, Z + 1) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X + 1, Y + 1, Z	) * VoxelSizeWorld);
 
-		Mesh.SetVertexUV(Vid1, FVector2f(0, 0));
-		Mesh.SetVertexUV(Vid2, FVector2f(1, 0));
-		Mesh.SetVertexUV(Vid3, FVector2f(1, 1));
-		Mesh.SetVertexUV(Vid4, FVector2f(0, 1));
+		
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	else if (FaceIndex == 1) // Bottom Face
+	else if (FaceIndex == 1) // Left
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X,		Y,	Z		) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X + 1, Y,	Z		) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X + 1, Y,	Z + 1	) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X,		Y,	Z + 1	) * VoxelSizeWorld);
-		Mesh.SetVertexUV(Vid1, FVector2f(0, 0));
-		Mesh.SetVertexUV(Vid2, FVector2f(0, 1));
-		Mesh.SetVertexUV(Vid3, FVector2f(1, 1));
-		Mesh.SetVertexUV(Vid4, FVector2f(1, 0));
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	else if (FaceIndex == 2) // Left Face
+	else if (FaceIndex == 2) // Back
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X,	Y,		Z		) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X,	Y,		Z + 1	) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X, Y + 1,	Z + 1	) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X, Y + 1,	Z		) * VoxelSizeWorld);
-		Mesh.SetVertexUV(Vid1, FVector2f(0, 0));
-		Mesh.SetVertexUV(Vid2, FVector2f(0, 0));
-		Mesh.SetVertexUV(Vid3, FVector2f(0, 1));
-		Mesh.SetVertexUV(Vid4, FVector2f(0, 1));
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	else if (FaceIndex == 3) // Right Face
+	else if (FaceIndex == 3) // Front
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X + 1, Y,		Z + 1	) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X + 1, Y,		Z		) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X + 1, Y + 1,	Z		) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X + 1, Y + 1,	Z + 1	) * VoxelSizeWorld);
-		Mesh.SetVertexUV(Vid1, FVector2f(1, 0));
-		Mesh.SetVertexUV(Vid2, FVector2f(1, 1));
-		Mesh.SetVertexUV(Vid3, FVector2f(1, 1));
-		Mesh.SetVertexUV(Vid4, FVector2f(1, 0));
+
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	else if (FaceIndex == 4) // Front Face
+	else if (FaceIndex == 4) // Top
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X,		Y,		Z + 1) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X + 1, Y,		Z + 1) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X + 1, Y + 1,	Z + 1) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X,		Y + 1,	Z + 1) * VoxelSizeWorld);
-		Mesh.SetVertexUV(Vid1, FVector2f(0, 1));
-		Mesh.SetVertexUV(Vid2, FVector2f(0, 1));
-		Mesh.SetVertexUV(Vid3, FVector2f(1, 1));
-		Mesh.SetVertexUV(Vid4, FVector2f(1, 1));
+
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	else if (FaceIndex == 5) // Back Face
+	else if (FaceIndex == 5) // Bottom
 	{
 		int Vid1 = Mesh.AppendVertex(FVector(X + 1,	Y,		Z) * VoxelSizeWorld);
 		int Vid2 = Mesh.AppendVertex(FVector(X,		Y,		Z) * VoxelSizeWorld);
 		int Vid3 = Mesh.AppendVertex(FVector(X,		Y + 1,	Z) * VoxelSizeWorld);
 		int Vid4 = Mesh.AppendVertex(FVector(X + 1, Y + 1,	Z) * VoxelSizeWorld);
-		Mesh.SetVertexUV(Vid1, FVector2f(0, 0));
-		Mesh.SetVertexUV(Vid2, FVector2f(1, 0));
-		Mesh.SetVertexUV(Vid3, FVector2f(1, 0));
-		Mesh.SetVertexUV(Vid4, FVector2f(0, 0));
+		Mesh.SetVertexUV(Vid1, FVector2f(UMin, VMax));
+		Mesh.SetVertexUV(Vid2, FVector2f(UMin, VMin));
+		Mesh.SetVertexUV(Vid3, FVector2f(UMax, VMin));
+		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 	AddTriangleIndices();
 }

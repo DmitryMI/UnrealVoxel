@@ -6,6 +6,7 @@
 #include "Components/SceneComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "Components/DynamicMeshComponent.h"
+#include "Voxel.h"
 #include "VoxelChunk.generated.h"
 
 
@@ -60,6 +61,6 @@ private:
 	void ProcessVoxels();
 	void ProcessVoxel(int32 X, int32 Y, int32 Z);
 	bool IsFaceVisible(int32 X, int32 Y, int32 Z) const;
-	void AddFaceData(int32 X, int32 Y, int32 Z, int FaceIndex);
+	void AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int FaceIndex);
 	void AddTriangleIndices();
 };
