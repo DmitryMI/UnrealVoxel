@@ -3,6 +3,8 @@
 #include "ContentBrowserModule.h"
 #include "IContentBrowserSingleton.h"
 #include "VoxelEngineEditor/Public/VoxelTextureAtlasCollection.h"
+#include "VoxelEngineEditor/Public/VoxelTextureAtlasGenerator.h"
+#include "Engine/AssetManager.h"
 
 #define LOCTEXT_NAMESPACE "VoxelEngineEditor"
 
@@ -27,7 +29,7 @@ void FVoxelEngineEditor::AddGenerateVoxelTextureAtlasContextMenuOption()
 {
     FContentBrowserModule& ContentBrowser = FModuleManager::LoadModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
     auto& Extenders = ContentBrowser.GetAllAssetViewContextMenuExtenders();
-    auto NewExtender = FContentBrowserMenuExtender_SelectedAssets::CreateStatic(&FVoxelEngineEditor::OnExtendContentBrowserAssetSelectionMenu);
+    auto NewExtender = FContentBrowserMenuExtender_SelectedAssets::CreateStatic(&FVoxelEngineEditor::ContentBrowserAssetSelectionMenuExtenderCallback);
     Extenders.Add(NewExtender);
 }
 
@@ -35,53 +37,70 @@ void FVoxelEngineEditor::RemoveGenerateVoxelTextureAtlasContextMenuOption()
 {
 }
 
-TSharedRef<FExtender> FVoxelEngineEditor::OnExtendContentBrowserAssetSelectionMenu(const TArray<FAssetData>& SelectedAssets)
+TSharedRef<FExtender> FVoxelEngineEditor::ContentBrowserAssetSelectionMenuExtenderCallback(const TArray<FAssetData>& SelectedAssets)
 {
+    UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+    TSharedRef<FExtender> Extender = MakeShared<FExtender>();
+
     UClass* ClassOfInterest = UVoxelTextureAtlasCollection::StaticClass();
-    
+
     for (const FAssetData& AssetData : SelectedAssets)
     {
-        UObject* Asset = AssetData.GetAsset();
+        TArray<FSoftObjectPath> CollectionPath{ AssetData.GetSoftObjectPath() };
+        auto Handle = AssetManager->LoadAssetList(CollectionPath);
+        if (!Handle)
+        {
+            UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failed to load asset %s"), *AssetData.GetSoftObjectPath().ToString());
+            return Extender;
+        }
+        Handle->WaitUntilComplete();
+        UObject* Asset = Handle->GetLoadedAsset();
         if (!Asset)
         {
-            UE_LOG(LogVoxelEngineEditor, Error, TEXT("Cannot load asset %s"), *AssetData.AssetName.ToString());
-            return MakeShared<FExtender>();
+            UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failed to load asset %s"), *AssetData.GetSoftObjectPath().ToString());
+            Handle->ReleaseHandle();
+            return Extender;
         }
-        UBlueprint* BlueprintAsset = Cast<UBlueprint>(Asset);
-        if (!BlueprintAsset)
+        UVoxelTextureAtlasCollection* AtlasCollection = Cast<UVoxelTextureAtlasCollection>(Asset);
+        if (!AtlasCollection)
         {
-            return MakeShared<FExtender>();
+            Handle->ReleaseHandle();
+            return Extender;
         }
-        UClass* AssetClass = BlueprintAsset->ParentClass.Get();
-        if (!AssetClass->IsChildOf(ClassOfInterest))
-        {
-            return MakeShared<FExtender>();
-        }
+
+        Handle->ReleaseHandle();
     }
 
-    TSharedRef<FExtender> Extender = MakeShared<FExtender>();
     Extender->AddMenuExtension(
         "CommonAssetActions",
         EExtensionHook::After,
         nullptr,
-        FMenuExtensionDelegate::CreateStatic(&FVoxelEngineEditor::ExecuteGenerateVoxelTextureAtlas, SelectedAssets)
+        FMenuExtensionDelegate::CreateStatic(&FVoxelEngineEditor::MenuExtenderCallback, SelectedAssets)
     );
     return Extender;
 }
 
-void FVoxelEngineEditor::ExecuteGenerateVoxelTextureAtlas(FMenuBuilder& MenuBuilder, TArray<FAssetData> SelectedAssets)
+void FVoxelEngineEditor::MenuExtenderCallback(FMenuBuilder& MenuBuilder, TArray<FAssetData> SelectedAssets)
 {
     MenuBuilder.BeginSection("Your Asset Context", LOCTEXT("ASSET_CONTEXT", "VoxelEngine"));
     MenuBuilder.AddMenuEntry(
         LOCTEXT("ButtonName", "Generate Voxel Texture Atlas"),
         LOCTEXT("Button ToolTip", "Looks for voxel textures, create VoxelGraphicsData assets and generates Voxel Texture Atlas based on selected VoxelTextureAtlasCollection asset."),
         FSlateIcon(),
-        FUIAction(FExecuteAction::CreateLambda([SelectedAssets]() {})),
+        FUIAction(FExecuteAction::CreateStatic(&FVoxelEngineEditor::ExecuteGenerateVoxelTextureAtlasContextMenuAction, SelectedAssets)),
         NAME_None,
         EUserInterfaceActionType::Button
     );
 
     MenuBuilder.EndSection();
+}
+
+void FVoxelEngineEditor::ExecuteGenerateVoxelTextureAtlasContextMenuAction(TArray<FAssetData> SelectedAssets)
+{ 
+    for (const auto& AssetData : SelectedAssets)
+    {
+        UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(AssetData);
+    }
 }
 
 #undef LOCTEXT_NAMESPACE

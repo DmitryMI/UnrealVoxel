@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Texture2D.h"
+#include "VoxelTextureAtlasCollection.h"
 #include "VoxelTextureAtlasGenerator.generated.h"
 
 /**
@@ -22,4 +23,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelTextureAtlas", meta = (Keywords = "BeginDrawCanvasToRenderTarget", WorldContext = "WorldContextObject", UnsafeDuringActorConstruction = "true"))
 	static bool GenerateTextureAtlasFromArray(UObject* WorldContextObject, const TArray<UTexture2D*>& Textures, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize = 32);
+
+	static bool GenerateTextureAtlasV2(const FAssetData& VoxelTextureAtlasCollectionAssetData);
 };

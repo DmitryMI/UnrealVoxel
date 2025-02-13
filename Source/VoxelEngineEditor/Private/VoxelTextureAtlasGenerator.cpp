@@ -6,6 +6,9 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "VoxelEngine/Public/VoxelType.h"
 #include "Kismet/KismetRenderingLibrary.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "Editor/UnrealEd/Public/ObjectTools.h"
+#include "Engine/AssetManager.h"
 
 bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObject, const FName& TexturesPath, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize)
 {
@@ -109,5 +112,40 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasFromArray(UObject* WorldCo
 		AtlasRenderTarget->UpdateTexture2D(AtlasTexture, ETextureSourceFormat::TSF_RGBA16);
 		UE_LOG(LogVoxelEngineEditor, Display, TEXT("Atlas Texture %s updated"), *AtlasTexture->GetName());
 	}
+	return true;
+}
+
+bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(const FAssetData& VoxelTextureAtlasCollectionAssetData)
+{
+	UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+	check(AssetManager);
+	
+	TArray<FSoftObjectPath> CollectionPath{ VoxelTextureAtlasCollectionAssetData.GetSoftObjectPath() };
+	auto Handle = AssetManager->LoadAssetList(CollectionPath);
+	if (!Handle)
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failed to load asset %s"), *VoxelTextureAtlasCollectionAssetData.GetSoftObjectPath().ToString());
+		Handle->ReleaseHandle();
+		return false;
+	}
+	Handle->WaitUntilComplete();
+	UObject* Asset = Handle->GetLoadedAsset();
+	if (!Asset)
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failed to load asset %s"), *VoxelTextureAtlasCollectionAssetData.GetSoftObjectPath().ToString());
+		Handle->ReleaseHandle();
+		return false;
+	}
+	UVoxelTextureAtlasCollection* AtlasCollection = Cast<UVoxelTextureAtlasCollection>(Asset);
+	if (!AtlasCollection)
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failed to load Atlas Collection %s: Cast failed"), *VoxelTextureAtlasCollectionAssetData.GetSoftObjectPath().ToString());
+		Handle->ReleaseHandle();
+		return false;
+	}
+
+	AtlasCollection->bTestBool = true;
+
+	Handle->ReleaseHandle();
 	return true;
 }

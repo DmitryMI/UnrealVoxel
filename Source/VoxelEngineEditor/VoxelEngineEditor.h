@@ -19,6 +19,7 @@ private:
     void AddGenerateVoxelTextureAtlasContextMenuOption();
     void RemoveGenerateVoxelTextureAtlasContextMenuOption();
 
-    static TSharedRef<FExtender> OnExtendContentBrowserAssetSelectionMenu(const TArray<FAssetData>& SelectedAssets);
-    static void ExecuteGenerateVoxelTextureAtlas(FMenuBuilder& MenuBuilder, TArray<FAssetData> SelectedAssets);
+    static TSharedRef<FExtender> ContentBrowserAssetSelectionMenuExtenderCallback(const TArray<FAssetData>& SelectedAssets);
+    static void MenuExtenderCallback(FMenuBuilder& MenuBuilder, TArray<FAssetData> SelectedAssets);
+    static void ExecuteGenerateVoxelTextureAtlasContextMenuAction(TArray<FAssetData> SelectedAssets);
 };

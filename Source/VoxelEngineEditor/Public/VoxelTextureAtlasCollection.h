@@ -6,13 +6,14 @@
 #include "UObject/NoExportTypes.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Texture2D.h"
+#include "Engine/DataAsset.h"
 #include "VoxelTextureAtlasCollection.generated.h"
 
 /**
  * 
  */
 UCLASS(Blueprintable, BlueprintType)
-class VOXELENGINEEDITOR_API UVoxelTextureAtlasCollection : public UObject
+class VOXELENGINEEDITOR_API UVoxelTextureAtlasCollection : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 	
@@ -45,8 +46,13 @@ public:
 	UPROPERTY(EditAnywhere)
 	UTextureRenderTarget2D* EmissiveAtlas;
 
-	UFUNCTION(CallInEditor, Category="Generating")
-	void GenerateAtlasCollection();
+	
+	FPrimaryAssetId GetPrimaryAssetId() const override 
+	{ 
+		FPrimaryAssetId Id = Super::GetPrimaryAssetId();
+		return Id;
+	}
+	
 
 private:
 	

@@ -5,11 +5,12 @@
 #include "CoreMinimal.h"
 #include "VoxelEngine/Public/VoxelType.h"
 #include "Engine/Texture2D.h"
+#include "Engine/DataAsset.h"
 #include "VoxelGraphicsData.generated.h"
 
 
 UCLASS(Blueprintable)
-class VOXELENGINEEDITOR_API UVoxelGraphicsData : public UObject
+class VOXELENGINEEDITOR_API UVoxelGraphicsData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 public:
@@ -39,4 +40,6 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TArray<UTexture2D*> Emissive;
+
+	FPrimaryAssetId GetPrimaryAssetId() const override { return FPrimaryAssetId("VoxelGraphicsDataItems", GetFName()); }
 };
