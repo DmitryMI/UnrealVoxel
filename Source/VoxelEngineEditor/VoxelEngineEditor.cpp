@@ -2,8 +2,6 @@
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
 #include "IContentBrowserSingleton.h"
-#include "VoxelEngineEditor/Public/VoxelTextureAtlasCollection.h"
-#include "VoxelEngineEditor/Public/VoxelTextureAtlasGenerator.h"
 #include "Engine/AssetManager.h"
 
 #define LOCTEXT_NAMESPACE "VoxelEngineEditor"
@@ -39,9 +37,9 @@ void FVoxelEngineEditor::RemoveGenerateVoxelTextureAtlasContextMenuOption()
 
 TSharedRef<FExtender> FVoxelEngineEditor::ContentBrowserAssetSelectionMenuExtenderCallback(const TArray<FAssetData>& SelectedAssets)
 {
-    UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
     TSharedRef<FExtender> Extender = MakeShared<FExtender>();
-
+    /*
+    UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
     UClass* ClassOfInterest = UVoxelTextureAtlasCollection::StaticClass();
 
     for (const FAssetData& AssetData : SelectedAssets)
@@ -77,6 +75,7 @@ TSharedRef<FExtender> FVoxelEngineEditor::ContentBrowserAssetSelectionMenuExtend
         nullptr,
         FMenuExtensionDelegate::CreateStatic(&FVoxelEngineEditor::MenuExtenderCallback, SelectedAssets)
     );
+    */
     return Extender;
 }
 
@@ -99,7 +98,7 @@ void FVoxelEngineEditor::ExecuteGenerateVoxelTextureAtlasContextMenuAction(TArra
 { 
     for (const auto& AssetData : SelectedAssets)
     {
-        UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(AssetData);
+        // UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(AssetData);
     }
 }
 

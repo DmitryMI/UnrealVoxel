@@ -4,6 +4,7 @@
 #include "VoxelWorld.h"
 #include "Misc/DateTime.h"
 #include "SimplexNoise.h"
+#include "VoxelTextureAtlasGenerator.h"
 #include "VoxelEngine/VoxelEngine.h"
 
 // Sets default values
@@ -42,6 +43,11 @@ FIntVector AVoxelWorld::GetWorldSizeVoxel() const
 void AVoxelWorld::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!InitializeMaterials())
+	{
+		return;
+	}
 
 	if (!VoxelWorldGeneratorClass)
 	{
@@ -105,6 +111,35 @@ void AVoxelWorld::WorldGenerationFinishedCallback()
 	UE_LOG(LogVoxelEngine, Display, TEXT("Spawned %d Chunk components, %3.2f milliseconds"), ChunkWorldDimensions.X * ChunkWorldDimensions.Y, ChunkSpawnElapsedTime.GetTotalMilliseconds());
 }
 
+bool AVoxelWorld::InitializeMaterials()
+{
+	if (!RenderingSettings)
+	{
+		UE_LOG(LogVoxelEngine, Error, TEXT("InitializeMaterials() failed: RenderingSettings is nullptr"));
+		return false;
+	}
+
+	if (!RenderingSettings->BaseMaterial)
+	{
+		UE_LOG(LogVoxelEngine, Error, TEXT("InitializeMaterials() failed: RenderingSettings->BaseMaterial is nullptr"));
+		return false;
+	}
+
+	if (!UVoxelTextureAtlasGenerator::GenerateTextureAtlas(this, VoxelTypeSet, RenderingSettings))
+	{
+		UE_LOG(LogVoxelEngine, Error, TEXT("InitializeMaterials() failed: Atlas creation error."));
+		return false;
+	}
+
+	DynamicMaterialInstance = UMaterialInstanceDynamic::Create(RenderingSettings->BaseMaterial, this);
+	DynamicMaterialInstance->SetTextureParameterValue("BaseColorAtlas", RenderingSettings->BaseColorAtlas);
+	DynamicMaterialInstance->SetTextureParameterValue("MetallicAtlas", RenderingSettings->MetallicAtlas);
+	DynamicMaterialInstance->SetTextureParameterValue("SpecularAtlas", RenderingSettings->SpecularAtlas);
+	DynamicMaterialInstance->SetTextureParameterValue("EmissiveAtlas", RenderingSettings->EmissiveAtlas);
+	DynamicMaterialInstance->SetTextureParameterValue("NormalAtlas", RenderingSettings->NormalAtlas);
+	return true;
+}
+
 // Called every frame
 void AVoxelWorld::Tick(float DeltaTime)
 {
@@ -136,7 +171,7 @@ FIntVector AVoxelWorld::DelinearizeCoordinate(int32 LinearCoord) const
 
 const Voxel& AVoxelWorld::GetVoxel(const FIntVector& Coord) const
 {
-	int32 Index = LinearizeCoordinate(Coord.X, Coord.Y, Coord.Z);
+	size_t Index = LinearizeCoordinate(Coord.X, Coord.Y, Coord.Z);
 	return Voxels[Index];
 }
 
@@ -147,7 +182,8 @@ Voxel& AVoxelWorld::GetVoxel(const FIntVector& Coord)
 
 Voxel& AVoxelWorld::GetVoxel(int32 X, int32 Y, int32 Z)
 {
-	return Voxels[LinearizeCoordinate(X, Y, Z)];
+	size_t Index = LinearizeCoordinate(X, Y, Z);
+	return Voxels[Index];
 }
 
 void AVoxelWorld::GetChunkWorldDimensions(int32& OutX, int32& OutY) const
@@ -189,16 +225,28 @@ bool AVoxelWorld::IsVoxelTransparent(const FIntVector& Coord) const
 	}
 
 	const Voxel& Voxel = GetVoxel(Coord);
-	return Voxel.VoxelType == EVoxelType::Air;
+	if (Voxel.VoxelType.VoxelTypeId == FVoxelType::EmptyVoxelType)
+	{
+		return true;
+	}
+
+	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(Voxel.VoxelType);
+	check(VoxelData);
+	return VoxelData->bIsTransparent;
 }
 
 UMaterialInterface* AVoxelWorld::GetVoxelChunkMaterial() const
 {
-	return VoxelChunkMaterial;
+	return DynamicMaterialInstance;
 }
 
 FVector AVoxelWorld::GetVoxelCenterWorld(const FIntVector& Coord) const
 {
 	return GetActorLocation() + VoxelSizeWorld * FVector(Coord.X, Coord.Y, Coord.Z) * 1.5;
+}
+
+UVoxelTypeSet* AVoxelWorld::GetVoxelTypeSet() const
+{
+	return VoxelTypeSet;
 }
 

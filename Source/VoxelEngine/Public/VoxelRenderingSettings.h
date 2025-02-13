@@ -7,21 +7,28 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Texture2D.h"
 #include "Engine/DataAsset.h"
-#include "VoxelTextureAtlasCollection.generated.h"
+#include "VoxelRenderingSettings.generated.h"
 
 /**
  * 
  */
 UCLASS(Blueprintable, BlueprintType)
-class VOXELENGINEEDITOR_API UVoxelTextureAtlasCollection : public UPrimaryDataAsset
+class VOXELENGINE_API UVoxelRenderingSettings : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 	
 public:
 
-	UPROPERTY(EditAnywhere)
-	bool bTestBool = false;
+	UPROPERTY(EditDefaultsOnly)
+	UMaterialInterface* BaseMaterial = nullptr;
 
+	UPROPERTY(EditAnywhere)
+	int32 VoxelTextureSize = 32;
+
+	/// <summary>
+	/// Texture file name format:
+	/// T_<VoxelName>_<North|South|West|East|Top|Bottom>_<BaseColor|Metallic|Specular|Normal|Emissive>
+	/// </summary>
 	UPROPERTY(EditAnywhere)
 	FString PathToTexturesDirectory = "/Game/VoxelEngine/Graphics/Textures";
 
@@ -46,7 +53,6 @@ public:
 	UPROPERTY(EditAnywhere)
 	UTextureRenderTarget2D* EmissiveAtlas;
 
-	
 	FPrimaryAssetId GetPrimaryAssetId() const override 
 	{ 
 		FPrimaryAssetId Id = Super::GetPrimaryAssetId();

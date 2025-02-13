@@ -3,20 +3,26 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "VoxelEngine/Public/VoxelType.h"
-#include "Engine/Texture2D.h"
 #include "Engine/DataAsset.h"
-#include "VoxelGraphicsData.generated.h"
-
+#include "VoxelData.generated.h"
 
 UCLASS(Blueprintable)
-class VOXELENGINEEDITOR_API UVoxelGraphicsData : public UPrimaryDataAsset
+class VOXELENGINE_API UVoxelData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
-public:
 	
+public:
+	UPROPERTY(EditDefaultsOnly)
+	FName VoxelName;
+
+	UPROPERTY(EditDefaultsOnly)
+	bool bIsTransparent;
+
+	UPROPERTY(EditDefaultsOnly)
+	bool bIsTraversable;
+
 	UPROPERTY(EditAnywhere)
-	bool bDoNotRegenerate = false;
+	bool bDoNotRegenerateGraphicsData = false;
 
 	// Array elements interpretation
 	// 0 elements - default value will be used
@@ -41,5 +47,5 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<UTexture2D*> Emissive;
 
-	FPrimaryAssetId GetPrimaryAssetId() const override { return FPrimaryAssetId("VoxelGraphicsDataItems", GetFName()); }
+
 };

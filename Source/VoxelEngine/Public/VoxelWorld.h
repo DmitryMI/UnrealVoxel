@@ -8,6 +8,10 @@
 #include "VoxelChunk.h"
 #include "VoxelWorldGenerator.h"
 #include <vector>
+#include "VoxelTypeSet.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "VoxelRenderingSettings.h"
 #include "VoxelWorld.generated.h"
 
 UCLASS()
@@ -48,6 +52,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	FVector GetVoxelCenterWorld(const FIntVector& Coord) const;
 
+	UFUNCTION(BlueprintCallable)
+	UVoxelTypeSet* GetVoxelTypeSet() const;
+
 	virtual void Tick(float DeltaTime) override;
 
 	uint64 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
@@ -77,19 +84,27 @@ private:
 	TSubclassOf<UVoxelWorldGenerator> VoxelWorldGeneratorClass;
 
 	UPROPERTY(EditDefaultsOnly)
-	UMaterialInterface* VoxelChunkMaterial = nullptr;
+	UVoxelTypeSet* VoxelTypeSet = nullptr;
 
-	UPROPERTY(VisibleAnywhere)
-	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
+	UPROPERTY(EditDefaultsOnly)
+	UVoxelRenderingSettings* RenderingSettings = nullptr;
 
 	UPROPERTY(VisibleAnywhere)
 	TArray<UVoxelChunk*> Chunks;
+
+	UPROPERTY()
+	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
+
+	UPROPERTY()
+	UMaterialInstanceDynamic* DynamicMaterialInstance;
 
 	UPROPERTY()
 	UVoxelWorldGenerator* VoxelWorldGeneratorInstance;
 
 	UFUNCTION()
 	void WorldGenerationFinishedCallback();
+
+	bool InitializeMaterials();
 
 	std::vector<Voxel> Voxels;
 

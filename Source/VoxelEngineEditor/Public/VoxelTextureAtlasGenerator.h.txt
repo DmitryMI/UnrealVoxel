@@ -1,0 +1,77 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/Texture2D.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Engine/AssetManager.h"
+#include "VoxelEngine/VoxelEngine.h"
+#include "VoxelRenderingSettings.h"
+#include "VoxelTextureAtlasGenerator.generated.h"
+
+/**
+ * 
+ */
+UCLASS()
+class VOXELENGINE_API UVoxelTextureAtlasGenerator : public UBlueprintFunctionLibrary
+{
+	GENERATED_BODY()
+	
+public:
+	UFUNCTION(BlueprintCallable, Category = "VoxelTextureAtlas", meta = (Keywords = "BeginDrawCanvasToRenderTarget", WorldContext = "WorldContextObject", UnsafeDuringActorConstruction = "true"))
+	static bool GenerateTextureAtlas(UObject* WorldContextObject, const FName& TexturesPath, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize = 32);
+
+	UFUNCTION(BlueprintCallable, Category = "VoxelTextureAtlas", meta = (Keywords = "BeginDrawCanvasToRenderTarget", WorldContext = "WorldContextObject", UnsafeDuringActorConstruction = "true"))
+	static bool GenerateTextureAtlasFromArray(UObject* WorldContextObject, const TArray<UTexture2D*>& Textures, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize = 32);
+
+	static bool GenerateTextureAtlas(UVoxelRenderingSettings* RenderingSettings);
+	static bool GenerateTextureAtlasV2(const FAssetData& VoxelTextureAtlasCollectionAssetData);
+	static bool GenerateTextureAtlasV2(UVoxelTextureAtlasCollection* AtlasCollection);
+
+	static bool ParseTextureFileName(FString AssetName, FString& VoxelName, FString& Side, FString& TextureType);
+
+	template<typename T>
+	static TSharedPtr<FStreamableHandle> FindAssetsInDirectory(const FString& TexturesPath, TArray<T*>& OutLoadedAssets)
+	{
+		UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+		check(AssetManager);
+
+		FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+		FARFilter Filter;
+		Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
+		Filter.bRecursiveClasses = true;
+		Filter.PackagePaths.Add(FName(TexturesPath));
+
+		TArray<FAssetData> AssetData;
+		AssetRegistryModule.Get().GetAssets(Filter, AssetData);
+		UE_LOG(LogVoxelEngine, Display, TEXT("Found %d assets in %s"), AssetData.Num(), *TexturesPath);
+
+		TArray<FSoftObjectPath> AssetPaths;
+		for (const FAssetData& AssetDataItem : AssetData)
+		{
+			AssetPaths.Add(AssetDataItem.GetSoftObjectPath());
+		}
+
+		auto Handle = AssetManager->LoadAssetList(AssetPaths);
+		if (!Handle)
+		{
+			UE_LOG(LogVoxelEngine, Error, TEXT("Failed to load assets from %s"), *TexturesPath);
+			return nullptr;
+		}
+		Handle->WaitUntilComplete();
+
+		TArray<UObject*> LoadedAssets;
+		Handle->GetLoadedAssets(LoadedAssets);
+		check(LoadedAssets.Num() == AssetPaths.Num());
+
+		for (UObject* LoadedAsset : LoadedAssets)
+		{
+			OutLoadedAssets.Add(Cast<T>(LoadedAsset));
+		}
+
+		return Handle;
+	}
+};

@@ -2,13 +2,12 @@
 
 
 #include "VoxelTextureAtlasGenerator.h"
-#include "VoxelEngineEditor/VoxelEngineEditor.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "VoxelEngine/Public/VoxelType.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "VoxelData.h"
 #include "Editor/UnrealEd/Public/ObjectTools.h"
-#include "Engine/AssetManager.h"
 
 bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObject, const FName& TexturesPath, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize)
 {
@@ -32,7 +31,7 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObje
 	UE_LOG(LogVoxelEngineEditor, Display, TEXT("Found %d assets in %s"), AssetData.Num(), *TexturesPath.ToString());
 
 	TArray<UTexture2D*> Textures;
-	Textures.SetNum(static_cast<int32>(EVoxelType::MAX));
+	Textures.SetNum(static_cast<int32>(3));
 
 	for (const FAssetData& Asset : AssetData)
 	{
@@ -144,8 +143,90 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(const FAssetData& Voxel
 		return false;
 	}
 
-	AtlasCollection->bTestBool = true;
+	bool bOk = GenerateTextureAtlasV2(AtlasCollection);
 
 	Handle->ReleaseHandle();
+	return bOk;
+}
+
+bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasV2(UVoxelTextureAtlasCollection* AtlasCollection)
+{
+	TArray<UTexture2D*> Textures;
+	auto StreamerHandler = FindAssetsInDirectory(AtlasCollection->PathToTexturesDirectory, Textures);
+	if (!StreamerHandler)
+	{
+		return false;
+	}
+
+	for (UTexture2D* Texture : Textures)
+	{
+		check(Texture);
+		FString TextureName = Texture->GetName();
+		int32 SizeX = Texture->GetImportedSize().X;
+		int32 SizeY = Texture->GetImportedSize().Y;
+		if ((SizeX != 6 * AtlasCollection->VoxelTextureSize) || (SizeY != AtlasCollection->VoxelTextureSize))
+		{
+			UE_LOG(LogVoxelEngineEditor, Error, TEXT("Texture %s has invalid dimensions: (%d, %d). Expected to be (%d, %d)"), *TextureName, SizeX, SizeY, 6 * AtlasCollection->VoxelTextureSize, AtlasCollection->VoxelTextureSize);
+			return false;
+		}
+		FString AssetName = Texture->GetName();
+		if (!AssetName.RemoveFromStart("T_"))
+		{
+			UE_LOG(LogVoxelEngineEditor, Error, TEXT("Voxel Texture must have a name in format 'T_VoxelType'. Texture %s has malformed name."), *TextureName);
+			
+			StreamerHandler->ReleaseHandle();
+			return false;
+		}
+
+		FString VoxelName;
+		FString TextureSide;
+		FString TextureType;
+		if (!ParseTextureFileName(AssetName, VoxelName, TextureSide, TextureType))
+		{
+			StreamerHandler->ReleaseHandle();
+			return false;
+		}
+		/* 
+		// UVoxelData*
+		  
+		int64 VoxelTypeInt = VoxelTypeEnum->GetValueByNameString(AssetName);
+		if (VoxelTypeInt == INDEX_NONE)
+		{
+			UE_LOG(LogVoxelEngineEditor, Error, TEXT("Failure during processing Voxel Texture %d: Voxel Type %s does not exist."), *Path, *AssetName);
+			
+			StreamerHandler->ReleaseHandle();
+			return false;
+		}
+		*/
+	}
+
+	StreamerHandler->ReleaseHandle();
+	return false;
+}
+
+bool UVoxelTextureAtlasGenerator::ParseTextureFileName(FString AssetName, FString& VoxelName, FString& Side, FString& TextureType)
+{
+	if (!AssetName.RemoveFromStart("T_"))
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Voxel Texture must have a name in format 'T_<VoxelName>_<North|South|West|East|Top|Bottom>_<BaseColor|Metallic|Specular|Normal|Emissive>'. Texture %s has malformed name."), *AssetName);
+		return false;
+	}
+
+	FString AfterName;
+	bool bOk = AssetName.Split("_", &VoxelName, &AfterName);
+	if (!bOk)
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Voxel Texture must have a name in format 'T_<VoxelName>_<North|South|West|East|Top|Bottom>_<BaseColor|Metallic|Specular|Normal|Emissive>'. Texture %s has malformed name."), *AssetName);
+		return false;
+	}
+
+	FString AfterSide;
+	bOk = AfterName.Split("_", &Side, &TextureType);
+	if (!bOk)
+	{
+		UE_LOG(LogVoxelEngineEditor, Error, TEXT("Voxel Texture must have a name in format 'T_<VoxelName>_<North|South|West|East|Top|Bottom>_<BaseColor|Metallic|Specular|Normal|Emissive>'. Texture %s has malformed name."), *AssetName);
+		return false;
+	}
+
 	return true;
 }
