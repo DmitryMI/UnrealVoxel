@@ -7,7 +7,7 @@
 #include "VoxelEngine/Public/VoxelType.h"
 #include "Kismet/KismetRenderingLibrary.h"
 
-bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObject, const FName& TexturesPath, UTextureRenderTarget2D* AtlasTexture, int32 VoxelTextureSize)
+bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObject, const FName& TexturesPath, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize)
 {
 	if (!AtlasTexture)
 	{
@@ -64,22 +64,22 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlas(UObject* WorldContextObje
 		Textures[VoxelTypeInt] = Texture;
 	}
 
-	return GenerateTextureAtlasFromArray(WorldContextObject, Textures, AtlasTexture, VoxelTextureSize);
+	return GenerateTextureAtlasFromArray(WorldContextObject, Textures, AtlasRenderTarget, AtlasTexture, VoxelTextureSize);
 }
 
-bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasFromArray(UObject* WorldContextObject, const TArray<UTexture2D*>& Textures, UTextureRenderTarget2D* AtlasTexture, int32 VoxelTextureSize)
+bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasFromArray(UObject* WorldContextObject, const TArray<UTexture2D*>& Textures, UTextureRenderTarget2D* AtlasRenderTarget, UTexture2D* AtlasTexture, int32 VoxelTextureSize)
 {
 	check(AtlasTexture);
 
 	int32 AtlasSizeX = 6 * VoxelTextureSize;
 	int32 AtlasSizeY = VoxelTextureSize * Textures.Num();
 	UE_LOG(LogVoxelEngineEditor, Display, TEXT("Resizing Render Target %s to (%d, %d) to accommodate %d voxel textures"), *AtlasTexture->GetName(), AtlasSizeX, AtlasSizeY, Textures.Num());
-	AtlasTexture->ResizeTarget(AtlasSizeX, AtlasSizeY);
+	AtlasRenderTarget->ResizeTarget(AtlasSizeX, AtlasSizeY);
 
 	UCanvas* AtlasCanvas;
 	FVector2D CanvasSize(AtlasSizeX, AtlasSizeY);
 	FDrawToRenderTargetContext DrawContext;
-	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(WorldContextObject, AtlasTexture, AtlasCanvas, CanvasSize, DrawContext);
+	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(WorldContextObject, AtlasRenderTarget, AtlasCanvas, CanvasSize, DrawContext);
 
 	for (int32 Index = 0; Index < Textures.Num(); Index++)
 	{
@@ -100,10 +100,15 @@ bool UVoxelTextureAtlasGenerator::GenerateTextureAtlasFromArray(UObject* WorldCo
 		float Rotation = 0;
 		FVector2D PivotPoint(0.5, 0.5);
 		AtlasCanvas->K2_DrawTexture(Texture, ScreenPosition, ScreenSize, TextureUvStart, TextureUvSize, RenderColor, BlendMode, Rotation, PivotPoint);
-		UE_LOG(LogVoxelEngineEditor, Display, TEXT("Drawing finished for %s at UV (%3.2f, %3.2f)"), *Texture->GetName(), ScreenPosition.X, ScreenPosition.Y);
+		UE_LOG(LogVoxelEngineEditor, Display, TEXT("Drawing finished for %s at Atlas Position (%3.2f, %3.2f)"), *Texture->GetName(), ScreenPosition.X, ScreenPosition.Y);
 	}
 
 	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(WorldContextObject, DrawContext);
 
+	if (AtlasTexture)
+	{
+		AtlasRenderTarget->UpdateTexture2D(AtlasTexture, ETextureSourceFormat::TSF_RGBA16);
+		UE_LOG(LogVoxelEngineEditor, Display, TEXT("Atlas Texture %s updated"), *AtlasTexture->GetName());
+	}
 	return true;
 }
