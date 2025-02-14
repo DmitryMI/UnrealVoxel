@@ -8,6 +8,7 @@
 - [ ] Convert Voxel Engine to a Plugin
 
 ## First working game: Sheeps and Wolves TODO List
+- [ ] Voxel Engine auto-pull and build system
 - [ ] Plant spawn system
 - [ ] Sheep movement and navigation
 - [ ] Sheep eat plants
