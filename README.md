@@ -5,6 +5,7 @@
 - [ ] Basic Movement Component
 - [ ] Navigation System
 - [ ] Interactive Doodad System with efficient proximity-search algorithm
+- [ ] Convert Voxel Engine to a Plugin
 
 ## First working game: Sheeps and Wolves TODO List
 - [ ] Plant spawn system
