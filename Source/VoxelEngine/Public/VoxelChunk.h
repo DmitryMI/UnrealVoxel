@@ -62,6 +62,7 @@ private:
 	void ProcessVoxel(int32 X, int32 Y, int32 Z);
 	bool IsFaceVisible(int32 X, int32 Y, int32 Z) const;
 	void AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int FaceIndex);
+	int32 GetVoxelLinearIndex(int32 X, int32 Y, int32 Z) const;
 
 	bool CopyVertexColorsToOverlay(
 		const FDynamicMesh3& Mesh,
