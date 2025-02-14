@@ -62,5 +62,10 @@ private:
 	void ProcessVoxel(int32 X, int32 Y, int32 Z);
 	bool IsFaceVisible(int32 X, int32 Y, int32 Z) const;
 	void AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int FaceIndex);
-	void AddTriangleIndices();
+
+	bool CopyVertexColorsToOverlay(
+		const FDynamicMesh3& Mesh,
+		UE::Geometry::FDynamicMeshColorOverlay& ColorOverlayOut,
+		bool bCompactElements
+	);
 };
