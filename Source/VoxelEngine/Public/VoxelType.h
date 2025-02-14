@@ -20,11 +20,6 @@ public:
 
     VoxelType VoxelTypeId;
 
-    operator VoxelType() const
-    {
-        return VoxelTypeId;
-    }
-
     operator int32() const
     {
         return VoxelTypeId;

@@ -258,11 +258,14 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 		Mesh.SetVertexUV(Vid4, FVector2f(UMax, VMax));
 	}
 
-	FVector3f VertexColor{ 0, 1, 0 };
-	Mesh.SetVertexColor(Vid1, VertexColor);
-	Mesh.SetVertexColor(Vid2, VertexColor);
-	Mesh.SetVertexColor(Vid3, VertexColor);
-	Mesh.SetVertexColor(Vid4, VertexColor);
+	if (FaceIndex == 0 && Voxel.VoxelType == 1)
+	{
+		FVector3f VertexColor{ 0.4, 1, 0.4 };
+		Mesh.SetVertexColor(Vid1, VertexColor);
+		Mesh.SetVertexColor(Vid2, VertexColor);
+		Mesh.SetVertexColor(Vid3, VertexColor);
+		Mesh.SetVertexColor(Vid4, VertexColor);
+	}
 
 	int Tid1 = Mesh.AppendTriangle(Vid3, Vid2, Vid1);
 	int Tid2 = Mesh.AppendTriangle(Vid4, Vid3, Vid1);
