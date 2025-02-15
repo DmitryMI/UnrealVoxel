@@ -69,15 +69,10 @@ void AVoxelWorld::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled)
 
 void AVoxelWorld::RegenerateChunkMeshes()
 {
-	FDateTime StartTime = FDateTime::Now();
 	for (UVoxelChunk* Chunk : Chunks)
 	{
-		Chunk->RegenerateMesh();
+		Chunk->MarkMeshDirty();
 	}
-	FDateTime EndTime = FDateTime::Now();
-
-	FTimespan ElapsedTime = EndTime - StartTime;
-	UE_LOG(LogVoxelEngine, Display, TEXT("Chunk meshes regenerated, %d chunks in total, %3.2f milliseconds"), Chunks.Num(), ElapsedTime.GetTotalMilliseconds());
 }
 
 FIntVector AVoxelWorld::GetWorldSizeVoxel() const
@@ -252,6 +247,11 @@ int32 AVoxelWorld::GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) co
 	return ChunkIndex;
 }
 
+UVoxelChunk* AVoxelWorld::GetChunkFromVoxelCoord(const FIntVector& Coord) const
+{
+	return Chunks[GetChunkIndexFromChunkCoord(GetChunkCoordFromVoxelCoord(Coord))];
+}
+
 const Voxel& AVoxelWorld::GetVoxel(const FIntVector& Coord) const
 {
 	size_t Index = LinearizeCoordinate(Coord.X, Coord.Y, Coord.Z);
@@ -338,21 +338,11 @@ double AVoxelWorld::GetVoxelSizeWorld() const
 
 bool AVoxelWorld::IsVoxelTransparent(const FIntVector& Coord) const
 {
-	if (Coord.X < 0 || Coord.X >= ChunkWorldDimensions.X * ChunkSide)
+	if (!IsValidCoordinate(Coord))
 	{
 		return true;
 	}
-
-	if (Coord.Y < 0 || Coord.Y >= ChunkWorldDimensions.Y * ChunkSide)
-	{
-		return true;
-	}
-
-	if (Coord.Z < 0 || Coord.Z >= WorldHeight)
-	{
-		return true;
-	}
-
+	
 	const Voxel& Voxel = GetVoxel(Coord);
 	if (Voxel.VoxelTypeId == EmptyVoxelType)
 	{
@@ -360,6 +350,18 @@ bool AVoxelWorld::IsVoxelTransparent(const FIntVector& Coord) const
 	}
 
 	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(Voxel.VoxelTypeId);
+	check(VoxelData);
+	return VoxelData->bIsTransparent;
+}
+
+bool AVoxelWorld::IsVoxelTransparentTypeOverride(const FIntVector& Coord, VoxelType VoxelType) const
+{
+	if (!IsValidCoordinate(Coord))
+	{
+		return true;
+	}
+
+	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(VoxelType);
 	check(VoxelData);
 	return VoxelData->bIsTransparent;
 }

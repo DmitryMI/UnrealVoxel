@@ -26,10 +26,8 @@ enum class EVoxelChangeExpectationMismatch
 UENUM()
 enum class EVoxelChangeResult
 {
-	// Voxel change was executed inside method call
+	// Voxel change was executed and renderer was notified
 	Executed = 0,
-	// Voxel changed in CPU memory but rendering was delayed. It may be executed in this frame or later.
-	RenderingEnqueued = 1,
 	// Voxel change is invalid, do not retry the same request.
 	Rejected = 2
 };

@@ -75,8 +75,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	double GetVoxelSizeWorld() const;
 
-	UFUNCTION(BlueprintCallable)
 	bool IsVoxelTransparent(const FIntVector& Coord) const;
+
+	bool IsVoxelTransparentTypeOverride(const FIntVector& Coord, VoxelType VoxelType) const;
 
 	UFUNCTION(BlueprintCallable)
 	UMaterialInterface* GetVoxelChunkMaterial() const;
@@ -95,6 +96,7 @@ public:
 
 	FIntVector2 GetChunkCoordFromVoxelCoord(const FIntVector& Coord) const;
 	int32 GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) const;
+	UVoxelChunk* GetChunkFromVoxelCoord(const FIntVector& Coord) const;
 
 	const Voxel& GetVoxel(const FIntVector& Coord) const;
 

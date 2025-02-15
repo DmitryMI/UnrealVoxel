@@ -10,13 +10,44 @@
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 #include "VoxelEngine/VoxelEngine.h"
 
+
+void FVoxelChunkSecondaryTickFunction::ExecuteTick(float DeltaTime, ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
+{
+	if (!IsValid(Target) || !IsValid(Target->GetOwner()))
+	{
+		return;
+	}
+	if (Target->GetOwner()->IsPendingKillPending())
+	{
+		return;
+	}
+	if (!Target->GetOwner()->AllowReceiveTickEventOnDedicatedServer() && IsRunningDedicatedServer())
+	{
+		return;
+	}
+	if ((TickType == LEVELTICK_ViewportsOnly) && !Target->GetOwner()->ShouldTickIfViewportsOnly())
+	{
+		return;
+	}
+
+	FScopeCycleCounterUObject ActorScope(Target);
+	Target->TickSecondary(DeltaTime * Target->GetOwner()->CustomTimeDilation, TickType, CurrentThread, MyCompletionGraphEvent, this);
+}
+
+FString FVoxelChunkSecondaryTickFunction::DiagnosticMessage()
+{
+	return FString();
+}
+
+
 // Sets default values for this component's properties
 UVoxelChunk::UVoxelChunk()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-
-	// DynamicMeshComponent = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("DynamicMesh"));
-	// DynamicMeshComponent->SetupAttachment(this);
+	SecondaryComponentTick.TickGroup = TG_LastDemotable;
+	SecondaryComponentTick.bCanEverTick = true;
+	SecondaryComponentTick.bStartWithTickEnabled = true;
+	SecondaryComponentTick.TickInterval = 0.1;
 }
 
 // Called when the game starts
@@ -26,6 +57,14 @@ void UVoxelChunk::BeginPlay()
 
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	check(VoxelWorld);
+
+	if (!IsTemplate() && SecondaryComponentTick.bCanEverTick)
+	{
+		SecondaryComponentTick.Target = this;
+		SecondaryComponentTick.SetTickFunctionEnable(
+			SecondaryComponentTick.bStartWithTickEnabled);
+		SecondaryComponentTick.RegisterTickFunction(VoxelWorld->GetLevel());
+	}
 
 	FIntVector MinVoxel;
 	FIntVector MaxVoxel;
@@ -39,6 +78,7 @@ void UVoxelChunk::BeginPlay()
 	FAttachmentTransformRules Rules(EAttachmentRule::KeepRelative, false);
 	DynamicMeshComponent->AttachToComponent(this, Rules);
 
+	VisibleVoxelIndices.SetNum(VoxelWorld->GetChunkSide() * VoxelWorld->GetChunkSide() * VoxelWorld->GetWorldHeight(), false);
 	GenerateMesh();
 }
 
@@ -51,7 +91,7 @@ void UVoxelChunk::GenerateMesh()
 	UDynamicMesh* MeshObj = DynamicMeshComponent->GetDynamicMesh();
 	checkSlow(MeshObj);
 	FDynamicMesh3& Mesh = MeshObj->GetMeshRef();
-	VisibleVoxelIndices.Empty();
+	VisibleVoxelIndices.Init(false, VisibleVoxelIndices.Num());
 	Mesh.Clear();
 	Mesh.EnableVertexUVs(FVector2f(0, 0));
 	Mesh.EnableVertexColors(FVector3f(1, 1, 1));
@@ -94,6 +134,7 @@ void UVoxelChunk::GenerateMesh()
 	DynamicMeshComponent->SetMaterial(0, VoxelWorld->GetVoxelChunkMaterial());
 	DynamicMeshComponent->NotifyMeshUpdated();
 	DynamicMeshComponent->SetEnableFlatShading(true);
+	bIsMeshDirty = false;
 }
 
 void UVoxelChunk::ProcessVoxels()
@@ -139,15 +180,8 @@ void UVoxelChunk::ProcessVoxel(int32 X, int32 Y, int32 Z)
 
 	VoxelWorld->IsVoxelTransparent(CoordTranslated);
 
-	TArray<bool, TFixedAllocator<6>> FacesVisibility;
-	FacesVisibility.SetNumUninitialized(6);
-	FacesVisibility[0] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z + 1); // Top
-	FacesVisibility[1] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z - 1); // Bottom
-	FacesVisibility[2] = IsFaceVisible(CoordTranslated.X + 1, CoordTranslated.Y, CoordTranslated.Z); // Front
-	FacesVisibility[3] = IsFaceVisible(CoordTranslated.X - 1, CoordTranslated.Y, CoordTranslated.Z); // Back
-	FacesVisibility[4] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y - 1, CoordTranslated.Z); // Left
-	FacesVisibility[5] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y + 1, CoordTranslated.Z); // Right
-	int VisibleFacesNum = 0;
+	TStaticArray<bool, 6> FacesVisibility;
+	int VisibleFacesNum = CheckVoxelSidesVisibility(CoordTranslated, FacesVisibility);
 	for (int I = 0; I < FacesVisibility.Num(); I++)
 	{
 		if (FacesVisibility[I])
@@ -156,10 +190,10 @@ void UVoxelChunk::ProcessVoxel(int32 X, int32 Y, int32 Z)
 			VisibleFacesNum++;
 		}
 	}
-
 	if (VisibleFacesNum > 0)
 	{
-		VisibleVoxelIndices.AddHead(LinearizeCoordinate(X, Y, Z));
+		int32 VoxelIndex = LinearizeCoordinate(X, Y, Z);
+		VisibleVoxelIndices[VoxelIndex] = true;
 	}
 }
 
@@ -272,9 +306,6 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 		VertexInfos[3].UV = FVector2f(UMax, VMax);
 	}
 
-	//int32 VoxelIndex = GetVoxelLinearIndex(X, Y, Z);
-	//int32 VertexIdMin = VoxelIndex * 6 * 4 + FaceIndex * 4;
-	//int32 TriangleIdMin = VoxelIndex * 6 * 2 + FaceIndex * 2;
 	int32 VertexIdMin = Mesh.MaxVertexID();
 	int32 TriangleIdMin = Mesh.MaxTriangleID();
 
@@ -346,6 +377,36 @@ FIntVector UVoxelChunk::DelinearizeCoordinate(int32 LinearCoord) const
 	return FIntVector(X, Y, Z);
 }
 
+void UVoxelChunk::ProcessChangeRequest(const FVoxelChange& Request)
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+
+	if (Request.ChangeToVoxelType == Request.ExpectedVoxelType)
+	{
+		return;
+	}
+
+	FIntVector ChunkMin;
+	FIntVector ChunkMax;
+	GetVoxelBoundingBox(ChunkMin, ChunkMax);
+
+	FIntVector LocalCoord = Request.Coordinate - ChunkMin;
+	int32 VoxelIndex = LinearizeCoordinate(LocalCoord.X, LocalCoord.Y, LocalCoord.Z);
+	bool bWasVisible = VisibleVoxelIndices[VoxelIndex];
+	bool bIsNowVisible = VoxelWorld->IsVoxelTransparent(Request.Coordinate);
+	if (bWasVisible == bIsNowVisible)
+	{
+		return;
+	}
+
+	UpdateVoxelVisibility(Request.Coordinate, true);
+
+	VisibleVoxelIndices[VoxelIndex] = bIsNowVisible;
+	
+	bIsMeshDirty = true;
+}
+
 
 bool UVoxelChunk::CopyVertexColorsToOverlay(const FDynamicMesh3& Mesh, UE::Geometry::FDynamicMeshColorOverlay& ColorOverlayOut, bool bCompactElements)
 {
@@ -382,6 +443,76 @@ bool UVoxelChunk::CopyVertexColorsToOverlay(const FDynamicMesh3& Mesh, UE::Geome
 	return true;
 }
 
+int UVoxelChunk::CheckVoxelSidesVisibility(const FIntVector& CoordTranslated, TStaticArray<bool, 6>& SideVisilityFlags)
+{
+	SideVisilityFlags[0] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z + 1); // Top
+	SideVisilityFlags[1] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y, CoordTranslated.Z - 1); // Bottom
+	SideVisilityFlags[2] = IsFaceVisible(CoordTranslated.X + 1, CoordTranslated.Y, CoordTranslated.Z); // Front
+	SideVisilityFlags[3] = IsFaceVisible(CoordTranslated.X - 1, CoordTranslated.Y, CoordTranslated.Z); // Back
+	SideVisilityFlags[4] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y - 1, CoordTranslated.Z); // Left
+	SideVisilityFlags[5] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y + 1, CoordTranslated.Z); // Right
+	int VisibleFacesNum = 0;
+	for (int I = 0; I < SideVisilityFlags.Num(); I++)
+	{
+		if (SideVisilityFlags[I])
+		{
+			VisibleFacesNum++;
+		}
+	}
+
+	return VisibleFacesNum;
+}
+
+void UVoxelChunk::UpdateVoxelVisibility(const FIntVector& VoxelWorldCoord, bool bUpdateNeighbours)
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+	UVoxelChunk* VoxelOwner = VoxelWorld->GetChunkFromVoxelCoord(VoxelWorldCoord);
+	if (VoxelOwner == this)
+	{
+		FIntVector ChunkMin;
+		FIntVector ChunkMax;
+		GetVoxelBoundingBox(ChunkMin, ChunkMax);
+
+		FIntVector LocalCoord = VoxelWorldCoord - ChunkMin;
+		int32 Index = LinearizeCoordinate(LocalCoord.X, LocalCoord.Y, LocalCoord.Z);
+		TStaticArray<bool, 6> SidesFlags;
+		int VisibleFacesNum = CheckVoxelSidesVisibility(VoxelWorldCoord, SidesFlags);
+		bool OldVisibility = VisibleVoxelIndices[Index];
+		bool NewVisibility = VisibleFacesNum > 0;
+		if (OldVisibility == NewVisibility)
+		{
+			return;
+		}
+		
+		VisibleVoxelIndices[Index] = NewVisibility;
+
+		if (!bUpdateNeighbours)
+		{
+			return;
+		}
+
+		TStaticArray<FIntVector, 6> NeighbourVoxelWorldCoords
+		{
+			FIntVector(VoxelWorldCoord.X, VoxelWorldCoord.Y, VoxelWorldCoord.Z + 1),
+			FIntVector(VoxelWorldCoord.X, VoxelWorldCoord.Y, VoxelWorldCoord.Z - 1),
+			FIntVector(VoxelWorldCoord.X + 1, VoxelWorldCoord.Y, VoxelWorldCoord.Z),
+			FIntVector(VoxelWorldCoord.X - 1, VoxelWorldCoord.Y, VoxelWorldCoord.Z),
+			FIntVector(VoxelWorldCoord.X, VoxelWorldCoord.Y + 1, VoxelWorldCoord.Z),
+			FIntVector(VoxelWorldCoord.X, VoxelWorldCoord.Y - 1, VoxelWorldCoord.Z)
+		};
+		
+		for (const FIntVector& Coord : NeighbourVoxelWorldCoords)
+		{
+			UpdateVoxelVisibility(Coord, false);
+		}
+	}
+	else
+	{
+		VoxelOwner->UpdateVoxelVisibility(VoxelWorldCoord, bUpdateNeighbours);
+	}
+}
+
 
 // Called every frame
 void UVoxelChunk::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -394,6 +525,24 @@ void UVoxelChunk::TickComponent(float DeltaTime, ELevelTick TickType, FActorComp
 		checkSlow(VoxelWorld);
 		FBox3d Bbox = GetWorldBoundingBox();
 		DrawDebugBox(GetWorld(), Bbox.GetCenter(), Bbox.GetExtent(), FColor::Green);
+	}
+
+	FVoxelChange ChangeRequest;
+	while (VoxelChangeRequests.Dequeue(ChangeRequest))
+	{
+		ProcessChangeRequest(ChangeRequest);
+	}
+}
+
+void UVoxelChunk::TickSecondary(float DeltaTime, ELevelTick LevelTick, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent, FVoxelChunkSecondaryTickFunction* TickFunction)
+{
+	if (bIsMeshDirty)
+	{
+		FDateTime StartTime = FDateTime::Now();
+		RegenerateMesh();
+		FDateTime EndTime = FDateTime::Now();
+		FTimespan ElapsedTime = EndTime - StartTime;
+		UE_LOG(LogVoxelEngine, Display, TEXT("Chunk (%d, %d) mesh regenerated in %3.2f milliseconds"), ChunkX, ChunkY, ElapsedTime.GetTotalMilliseconds());
 	}
 }
 
@@ -459,21 +608,15 @@ bool UVoxelChunk::GetDrawWireframe() const
 	return bDebugDrawDimensions;
 }
 
+void UVoxelChunk::MarkMeshDirty()
+{
+	bIsMeshDirty = true;
+}
+
 EVoxelChangeResult UVoxelChunk::ChangeVoxelRendering(const FVoxelChange& VoxelChange)
 {
-	switch (VoxelChange.Priority)
-	{
-	case EVoxelChangeRenderPriority::Immidiate:
-		RegenerateMesh();
-		return EVoxelChangeResult::Executed;
-	case EVoxelChangeRenderPriority::SameFrame:
-		VoxelChangeRequestsThisFrame.Enqueue(VoxelChange);
-		return EVoxelChangeResult::RenderingEnqueued;
-	case EVoxelChangeRenderPriority::AnyTime:
-		VoxelChangeRequestsLaterFrame.Enqueue(VoxelChange);
-		return EVoxelChangeResult::RenderingEnqueued;
-	}
-	return EVoxelChangeResult::Rejected;
+	VoxelChangeRequests.Enqueue(VoxelChange);
+	return EVoxelChangeResult::Executed;
 }
 
 void UVoxelChunk::RegenerateMesh()
@@ -492,16 +635,17 @@ void UVoxelChunk::RegenerateMesh()
 	Mesh.EnableAttributes();
 	Mesh.Attributes()->EnablePrimaryColors();
 
-	for (int32 VoxelIndex : VisibleVoxelIndices)
+	for (TConstSetBitIterator<> It(VisibleVoxelIndices); It; ++It) 
 	{
-		FIntVector VoxelLocalCoord = DelinearizeCoordinate(VoxelIndex);
+		FIntVector VoxelLocalCoord = DelinearizeCoordinate(It.GetIndex());
 		ProcessVoxel(VoxelLocalCoord.X, VoxelLocalCoord.Y, VoxelLocalCoord.Z);
 	}
-
+	
 	bool bIsValid = UE::Geometry::CopyVertexUVsToOverlay(Mesh, *Mesh.Attributes()->PrimaryUV());
 	check(bIsValid);
 	bIsValid = CopyVertexColorsToOverlay(Mesh, *Mesh.Attributes()->PrimaryColors(), false);
 	check(bIsValid);
 	DynamicMeshComponent->NotifyMeshUpdated();
+	bIsMeshDirty = false;
 }
 
