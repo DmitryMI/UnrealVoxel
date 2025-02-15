@@ -51,6 +51,7 @@ void UVoxelChunk::GenerateMesh()
 	UDynamicMesh* MeshObj = DynamicMeshComponent->GetDynamicMesh();
 	checkSlow(MeshObj);
 	FDynamicMesh3& Mesh = MeshObj->GetMeshRef();
+	VisibleVoxelIndices.Empty();
 	Mesh.Clear();
 	Mesh.EnableVertexUVs(FVector2f(0, 0));
 	Mesh.EnableVertexColors(FVector3f(1, 1, 1));
@@ -58,10 +59,11 @@ void UVoxelChunk::GenerateMesh()
 	Mesh.Attributes()->EnablePrimaryColors();
 
 	ProcessVoxels();
-
+	bool bIsValid = true;
+	
 	UE::Geometry::FDynamicMesh3::FValidityOptions ValidityOptions;
 	UE::Geometry::EValidityCheckFailMode ValidityCheckFailMode = UE::Geometry::EValidityCheckFailMode::Ensure;
-	bool bIsValid = Mesh.CheckValidity(ValidityOptions, ValidityCheckFailMode);
+	bIsValid = Mesh.CheckValidity(ValidityOptions, ValidityCheckFailMode);
 	if (bIsValid)
 	{
 		UE_LOG(LogTemp, Display, TEXT("Dynamic Mesh passed validity check"));
@@ -70,9 +72,10 @@ void UVoxelChunk::GenerateMesh()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Dynamic Mesh failed validity check"));
 	}
-
+	
 	UE::Geometry::FDynamicMeshColorOverlay* ColorOverlay = Mesh.Attributes()->PrimaryColors();
 	check(ColorOverlay);
+	
 	bIsValid = ColorOverlay->CheckValidity(false, ValidityCheckFailMode);
 	if (bIsValid)
 	{
@@ -83,8 +86,9 @@ void UVoxelChunk::GenerateMesh()
 		UE_LOG(LogTemp, Error, TEXT("Dynamic Mesh  Color Overlay failed validity check"));
 		return;
 	}
-
-	UE::Geometry::CopyVertexUVsToOverlay(Mesh, *Mesh.Attributes()->PrimaryUV());
+	
+	bIsValid = UE::Geometry::CopyVertexUVsToOverlay(Mesh, *Mesh.Attributes()->PrimaryUV());
+	check(bIsValid);
 	bIsValid = CopyVertexColorsToOverlay(Mesh, *Mesh.Attributes()->PrimaryColors(), false);
 	check(bIsValid);
 	DynamicMeshComponent->SetMaterial(0, VoxelWorld->GetVoxelChunkMaterial());
@@ -143,13 +147,19 @@ void UVoxelChunk::ProcessVoxel(int32 X, int32 Y, int32 Z)
 	FacesVisibility[3] = IsFaceVisible(CoordTranslated.X - 1, CoordTranslated.Y, CoordTranslated.Z); // Back
 	FacesVisibility[4] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y - 1, CoordTranslated.Z); // Left
 	FacesVisibility[5] = IsFaceVisible(CoordTranslated.X, CoordTranslated.Y + 1, CoordTranslated.Z); // Right
-
+	int VisibleFacesNum = 0;
 	for (int I = 0; I < FacesVisibility.Num(); I++)
 	{
 		if (FacesVisibility[I])
 		{
 			AddFaceData(Voxel, X, Y, Z, I);
+			VisibleFacesNum++;
 		}
+	}
+
+	if (VisibleFacesNum > 0)
+	{
+		VisibleVoxelIndices.AddHead(LinearizeCoordinate(X, Y, Z));
 	}
 }
 
@@ -175,7 +185,7 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 	UE::Geometry::FDynamicMeshColorOverlay* ColorOverlay = Mesh.Attributes()->PrimaryColors();
 	check(ColorOverlay);
 
-	int32 VoxelTypeInt = Voxel.VoxelType.VoxelTypeId - 1;
+	int32 VoxelTypeInt = Voxel.VoxelTypeId - 1;
 	int32 VoxelTypeNum = VoxelWorld->GetVoxelTypeSet()->GetVoxelTypes().Num();
 	float UMin = static_cast<float>(FaceIndex) / 6;
 	float UMax = static_cast<float>(FaceIndex + 1) / 6;
@@ -262,11 +272,11 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 		VertexInfos[3].UV = FVector2f(UMax, VMax);
 	}
 
-	int32 VoxelIndex = GetVoxelLinearIndex(X, Y, Z);
-	int32 VertexIdMin = VoxelIndex * 6 * 4 + FaceIndex * 4;
-	int32 TriangleIdMin = VoxelIndex * 6 * 2 + FaceIndex * 2;
-	// int32 VertexIdMin = Mesh.MaxVertexID();
-	// int32 TriangleIdMin = Mesh.MaxTriangleID();
+	//int32 VoxelIndex = GetVoxelLinearIndex(X, Y, Z);
+	//int32 VertexIdMin = VoxelIndex * 6 * 4 + FaceIndex * 4;
+	//int32 TriangleIdMin = VoxelIndex * 6 * 2 + FaceIndex * 2;
+	int32 VertexIdMin = Mesh.MaxVertexID();
+	int32 TriangleIdMin = Mesh.MaxTriangleID();
 
 	Mesh.BeginUnsafeVerticesInsert();
 	for (int I = 0; I < VertexInfos.Num(); I++)
@@ -295,7 +305,7 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 	Mesh.EndUnsafeTrianglesInsert();
 
 	// TODO Remove this Grass hack
-	if (FaceIndex == 0 && Voxel.VoxelType == 1)
+	if (FaceIndex == 0 && Voxel.VoxelTypeId == 1)
 	{
 		FVector3f VertexColor{ 0.4, 1, 0.4 };
 		Mesh.SetVertexColor(VertexIdMin, VertexColor);
@@ -313,18 +323,29 @@ void UVoxelChunk::AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int
 	}
 }
 
-int32 UVoxelChunk::GetVoxelLinearIndex(int32 X, int32 Y, int32 Z) const
+int32 UVoxelChunk::LinearizeCoordinate(int32 X, int32 Y, int32 Z) const
 {
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	check(VoxelWorld);
 	int32 ChunkSide = VoxelWorld->GetChunkSide();
-	int32 ChunkHeight = VoxelWorld->GetWorldHeight();
 	int32 Result =
 		static_cast<int32>(Z * ChunkSide * ChunkSide) +
 		static_cast<int32>(Y * ChunkSide) +
 		static_cast<int32>(X);
 	return Result;
 }
+
+FIntVector UVoxelChunk::DelinearizeCoordinate(int32 LinearCoord) const
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+	int32 ChunkSide = VoxelWorld->GetChunkSide();
+	int32 X = LinearCoord % (ChunkSide);
+	int32 Y = (LinearCoord / (ChunkSide)) % (ChunkSide);
+	int32 Z = LinearCoord / ((ChunkSide) * (ChunkSide));
+	return FIntVector(X, Y, Z);
+}
+
 
 bool UVoxelChunk::CopyVertexColorsToOverlay(const FDynamicMesh3& Mesh, UE::Geometry::FDynamicMeshColorOverlay& ColorOverlayOut, bool bCompactElements)
 {
@@ -436,5 +457,51 @@ void UVoxelChunk::SetDrawWireframe(bool bEnabled)
 bool UVoxelChunk::GetDrawWireframe() const
 {
 	return bDebugDrawDimensions;
+}
+
+EVoxelChangeResult UVoxelChunk::ChangeVoxelRendering(const FVoxelChange& VoxelChange)
+{
+	switch (VoxelChange.Priority)
+	{
+	case EVoxelChangeRenderPriority::Immidiate:
+		RegenerateMesh();
+		return EVoxelChangeResult::Executed;
+	case EVoxelChangeRenderPriority::SameFrame:
+		VoxelChangeRequestsThisFrame.Enqueue(VoxelChange);
+		return EVoxelChangeResult::RenderingEnqueued;
+	case EVoxelChangeRenderPriority::AnyTime:
+		VoxelChangeRequestsLaterFrame.Enqueue(VoxelChange);
+		return EVoxelChangeResult::RenderingEnqueued;
+	}
+	return EVoxelChangeResult::Rejected;
+}
+
+void UVoxelChunk::RegenerateMesh()
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+
+	checkSlow(DynamicMeshComponent);
+	UDynamicMesh* MeshObj = DynamicMeshComponent->GetDynamicMesh();
+	checkSlow(MeshObj);
+	FDynamicMesh3& Mesh = MeshObj->GetMeshRef();
+
+	Mesh.Clear();
+	Mesh.EnableVertexUVs(FVector2f(0, 0));
+	Mesh.EnableVertexColors(FVector3f(1, 1, 1));
+	Mesh.EnableAttributes();
+	Mesh.Attributes()->EnablePrimaryColors();
+
+	for (int32 VoxelIndex : VisibleVoxelIndices)
+	{
+		FIntVector VoxelLocalCoord = DelinearizeCoordinate(VoxelIndex);
+		ProcessVoxel(VoxelLocalCoord.X, VoxelLocalCoord.Y, VoxelLocalCoord.Z);
+	}
+
+	bool bIsValid = UE::Geometry::CopyVertexUVsToOverlay(Mesh, *Mesh.Attributes()->PrimaryUV());
+	check(bIsValid);
+	bIsValid = CopyVertexColorsToOverlay(Mesh, *Mesh.Attributes()->PrimaryColors(), false);
+	check(bIsValid);
+	DynamicMeshComponent->NotifyMeshUpdated();
 }
 

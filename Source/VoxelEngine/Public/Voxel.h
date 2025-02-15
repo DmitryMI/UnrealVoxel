@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "VoxelType.h"
+#include <atomic>
 
 /**
  * 
@@ -11,5 +12,14 @@
 class VOXELENGINE_API Voxel
 {
 public:
-	FVoxelType VoxelType;
+	std::atomic<VoxelType> VoxelTypeId;
+	Voxel(VoxelType VoxelTypeId) : VoxelTypeId(VoxelTypeId)
+	{
+		
+	}
+
+	Voxel(const Voxel& Voxel) : VoxelTypeId(Voxel.VoxelTypeId.load())
+	{
+
+	}
 };

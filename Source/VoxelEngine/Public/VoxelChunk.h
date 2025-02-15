@@ -7,6 +7,8 @@
 #include "DynamicMesh/DynamicMesh3.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Voxel.h"
+#include "Containers/List.h"
+#include "VoxelChange.h"
 #include "VoxelChunk.generated.h"
 
 
@@ -41,6 +43,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool GetDrawWireframe() const;
 
+	EVoxelChangeResult ChangeVoxelRendering(const FVoxelChange& VoxelChange);
+
+	void RegenerateMesh();
+
 protected:
 	// Called when the game starts
 	void BeginPlay() override;
@@ -57,12 +63,17 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	UDynamicMeshComponent* DynamicMeshComponent;
 
+	TDoubleLinkedList<int32> VisibleVoxelIndices;
+	TQueue<FVoxelChange, EQueueMode::Mpsc> VoxelChangeRequestsThisFrame;
+	TQueue<FVoxelChange, EQueueMode::Mpsc> VoxelChangeRequestsLaterFrame;
+
 	void GenerateMesh();
 	void ProcessVoxels();
 	void ProcessVoxel(int32 X, int32 Y, int32 Z);
 	bool IsFaceVisible(int32 X, int32 Y, int32 Z) const;
 	void AddFaceData(const Voxel& Voxel, int32 X, int32 Y, int32 Z, int FaceIndex);
-	int32 GetVoxelLinearIndex(int32 X, int32 Y, int32 Z) const;
+	int32 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
+	FIntVector DelinearizeCoordinate(int32 LinearCoord) const;
 
 	bool CopyVertexColorsToOverlay(
 		const FDynamicMesh3& Mesh,

@@ -16,12 +16,12 @@ void USimplexNoiseVoxelWorldGenerator::GenerateWorld(AVoxelWorld* VoxelWorld, co
 
     UVoxelTypeSet* VoxelTypeSet = VoxelWorld->GetVoxelTypeSet();
     check(VoxelTypeSet);
-    FVoxelType GrassType = VoxelTypeSet->GetVoxelTypeByName("Grass");
-    FVoxelType DirtType = VoxelTypeSet->GetVoxelTypeByName("Dirt");
-    FVoxelType StoneType = VoxelTypeSet->GetVoxelTypeByName("Stone");
-    check(!GrassType.IsEmptyVoxelType());
-    check(!DirtType.IsEmptyVoxelType());
-    check(!StoneType.IsEmptyVoxelType());
+    VoxelType GrassType = VoxelTypeSet->GetVoxelTypeByName("Grass");
+    VoxelType DirtType = VoxelTypeSet->GetVoxelTypeByName("Dirt");
+    VoxelType StoneType = VoxelTypeSet->GetVoxelTypeByName("Stone");
+    check(GrassType != EmptyVoxelType);
+    check(DirtType != EmptyVoxelType);
+    check(StoneType != EmptyVoxelType);
 
 	FIntVector WorldSizeActual = VoxelWorld->GetWorldSizeVoxel();
     for (int X = 0; X < WorldSizeActual.X; X++)
@@ -42,19 +42,19 @@ void USimplexNoiseVoxelWorldGenerator::GenerateWorld(AVoxelWorld* VoxelWorld, co
 
                 if (Z <= DirtLowest)
                 {
-                    Voxel.VoxelType = StoneType;
+                    Voxel.VoxelTypeId = StoneType;
                 }
                 else if (Z < GrassLowest)
                 {
-                    Voxel.VoxelType = DirtType;
+                    Voxel.VoxelTypeId = DirtType;
                 }
                 else if (Z <= Height)
                 {
-                    Voxel.VoxelType = GrassType;
+                    Voxel.VoxelTypeId = GrassType;
                 }
                 else
                 {
-                    Voxel.VoxelType = 0;
+                    Voxel.VoxelTypeId = EmptyVoxelType;
                 }
             }
         }

@@ -30,9 +30,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	UVoxelData* GetVoxelDataByTypeId(int32 VoxelTypeId) const;
 
-	FVoxelType GetVoxelTypeByName(const FName& VoxelName) const;
+	VoxelType GetVoxelTypeByName(const FName& VoxelName) const;
 
-	UVoxelData* GetVoxelDataByType(FVoxelType VoxelType) const;
+	UVoxelData* GetVoxelDataByType(VoxelType VoxelType) const;
 
 #if WITH_EDITOR
 	UFUNCTION(BlueprintCallable)

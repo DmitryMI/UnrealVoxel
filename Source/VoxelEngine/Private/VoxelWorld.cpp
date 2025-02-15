@@ -7,11 +7,44 @@
 #include "VoxelTextureAtlasGenerator.h"
 #include "VoxelEngine/VoxelEngine.h"
 
+void FVoxelWorldSecondaryTickFunction::ExecuteTick(float DeltaTime, ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
+{
+	if (!IsValid(Target))
+	{
+		return;
+	}
+	if (Target->IsPendingKillPending())
+	{
+		return;
+	}
+	if (!Target->AllowReceiveTickEventOnDedicatedServer() && IsRunningDedicatedServer())
+	{
+		return;
+	}
+	if ((TickType == LEVELTICK_ViewportsOnly) && !Target->ShouldTickIfViewportsOnly())
+	{
+		return;
+	}
+
+	FScopeCycleCounterUObject ActorScope(Target);
+	Target->TickSecondary(DeltaTime * Target->CustomTimeDilation, TickType, CurrentThread, MyCompletionGraphEvent, this);
+}
+
+FString FVoxelWorldSecondaryTickFunction::DiagnosticMessage()
+{
+	return Target->GetFullName() + TEXT("[TickSecondary]");
+}
+
 // Sets default values
 AVoxelWorld::AVoxelWorld()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	SecondaryActorTick.TickGroup = TG_PrePhysics;
 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	SecondaryActorTick.TickGroup = TG_LastDemotable;
+	SecondaryActorTick.bCanEverTick = true;
+	SecondaryActorTick.bStartWithTickEnabled = true;
 }
 
 void AVoxelWorld::DrawChunkWireframes(bool bEnabled)
@@ -32,6 +65,19 @@ void AVoxelWorld::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled)
 
 	int32 ChunkIndex = ChunkY * ChunkWorldDimensions.X + ChunkX;
 	Chunks[ChunkIndex]->SetDrawWireframe(bEnabled);
+}
+
+void AVoxelWorld::RegenerateChunkMeshes()
+{
+	FDateTime StartTime = FDateTime::Now();
+	for (UVoxelChunk* Chunk : Chunks)
+	{
+		Chunk->RegenerateMesh();
+	}
+	FDateTime EndTime = FDateTime::Now();
+
+	FTimespan ElapsedTime = EndTime - StartTime;
+	UE_LOG(LogVoxelEngine, Display, TEXT("Chunk meshes regenerated, %d chunks in total, %3.2f milliseconds"), Chunks.Num(), ElapsedTime.GetTotalMilliseconds());
 }
 
 FIntVector AVoxelWorld::GetWorldSizeVoxel() const
@@ -77,7 +123,14 @@ void AVoxelWorld::BeginPlay()
 	size_t Width = ChunkWorldDimensions.Y * ChunkSide;
 	size_t Height = WorldHeight;
 	size_t VoxelsNum = Length * Width * Height;
-	Voxels.resize(VoxelsNum);
+
+	Voxels.reserve(VoxelsNum);
+
+	for (size_t I = 0; I < VoxelsNum; I++)
+	{
+		Voxels.emplace_back(EmptyVoxelType);
+	}
+
 	FDateTime AllocEndTime = FDateTime::Now();
 	FTimespan AllocElapsedTime = AllocEndTime - AllocStartTime;
 	UE_LOG(LogVoxelEngine, Display, TEXT("Voxel World memory allocated, %d voxels in total, %3.2f milliseconds"), Voxels.size(), AllocElapsedTime.GetTotalMilliseconds());
@@ -85,6 +138,18 @@ void AVoxelWorld::BeginPlay()
 	UVoxelWorldGenerator::FVoxelWorlGenerationFinished Callback;
 	Callback.BindUFunction(this, FName("WorldGenerationFinishedCallback"));
 	VoxelWorldGeneratorInstance->GenerateWorld(this, Callback);
+}
+
+void AVoxelWorld::PostInitProperties()
+{
+	Super::PostInitProperties();
+	if (!IsTemplate() && SecondaryActorTick.bCanEverTick)
+	{
+		SecondaryActorTick.Target = this;
+		SecondaryActorTick.SetTickFunctionEnable(
+			SecondaryActorTick.bStartWithTickEnabled);
+		SecondaryActorTick.RegisterTickFunction(GetLevel());
+	}
 }
 
 void AVoxelWorld::WorldGenerationFinishedCallback()
@@ -147,6 +212,10 @@ void AVoxelWorld::Tick(float DeltaTime)
 
 }
 
+void AVoxelWorld::TickSecondary(float DeltaTime, ELevelTick LevelTick, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent, FVoxelWorldSecondaryTickFunction* TickFunction)
+{
+}
+
 uint64 AVoxelWorld::LinearizeCoordinate(int32 X, int32 Y, int32 Z) const
 {
 	checkSlow(0 <= X && X <= ChunkWorldDimensions.X * ChunkSide);
@@ -161,12 +230,26 @@ uint64 AVoxelWorld::LinearizeCoordinate(int32 X, int32 Y, int32 Z) const
 	return Result;
 }
 
-FIntVector AVoxelWorld::DelinearizeCoordinate(int32 LinearCoord) const
+FIntVector AVoxelWorld::DelinearizeCoordinate(uint64 LinearCoord) const
 {
 	int32 X = LinearCoord % (ChunkWorldDimensions.X * ChunkSide);
 	int32 Y = (LinearCoord / (ChunkWorldDimensions.X * ChunkSide)) % (ChunkWorldDimensions.Y * ChunkSide);
 	int32 Z = LinearCoord / ((ChunkWorldDimensions.X * ChunkSide) * (ChunkWorldDimensions.Y * ChunkSide));
 	return FIntVector(X, Y, Z);
+}
+
+FIntVector2 AVoxelWorld::GetChunkCoordFromVoxelCoord(const FIntVector& Coord) const
+{
+	int32 ChunkX = Coord.X / ChunkSide;
+	int32 ChunkY = Coord.Y / ChunkSide;
+	
+	return FIntVector2(ChunkX, ChunkY);
+}
+
+int32 AVoxelWorld::GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) const
+{
+	int32 ChunkIndex = ChunkCoord.Y * ChunkWorldDimensions.X + ChunkCoord.X;
+	return ChunkIndex;
 }
 
 const Voxel& AVoxelWorld::GetVoxel(const FIntVector& Coord) const
@@ -184,6 +267,52 @@ Voxel& AVoxelWorld::GetVoxel(int32 X, int32 Y, int32 Z)
 {
 	size_t Index = LinearizeCoordinate(X, Y, Z);
 	return Voxels[Index];
+}
+
+bool AVoxelWorld::IsValidCoordinate(const FIntVector& Coord) const
+{
+	bool bIsValid = (0 <= Coord.X && Coord.X <= ChunkWorldDimensions.X * ChunkSide);
+	if (!bIsValid)
+	{
+		return false;
+	}
+	bIsValid = (0 <= Coord.Y && Coord.Y <= ChunkWorldDimensions.Y * ChunkSide);
+	if (!bIsValid)
+	{
+		return false;
+	}
+	bIsValid = (0 <= Coord.Z && Coord.Z <= WorldHeight);
+	return bIsValid;
+}
+
+EVoxelChangeResult AVoxelWorld::ChangeVoxel(FVoxelChange& VoxelChange)
+{
+	if (!IsValidCoordinate(VoxelChange.Coordinate))
+	{
+		return EVoxelChangeResult::Rejected;
+	}
+
+	Voxel& TargetVoxel = GetVoxel(VoxelChange.Coordinate);
+
+	if (VoxelChange.ExpectationMismatch == EVoxelChangeExpectationMismatch::Overwrite)
+	{
+		while (!TargetVoxel.VoxelTypeId.compare_exchange_strong(VoxelChange.ExpectedVoxelType, VoxelChange.ChangeToVoxelType))
+		{
+
+		}
+	}
+	else if (VoxelChange.ExpectationMismatch == EVoxelChangeExpectationMismatch::Reject)
+	{
+		if (!TargetVoxel.VoxelTypeId.compare_exchange_strong(VoxelChange.ExpectedVoxelType, VoxelChange.ChangeToVoxelType))
+		{
+			return EVoxelChangeResult::Rejected;
+		}
+	}
+
+	int32 VoxelChunkIndex = GetChunkIndexFromChunkCoord(GetChunkCoordFromVoxelCoord(VoxelChange.Coordinate));
+	check(0 <= VoxelChunkIndex && VoxelChunkIndex < Chunks.Num());
+	UVoxelChunk* Chunk = Chunks[VoxelChunkIndex];
+	return Chunk->ChangeVoxelRendering(VoxelChange);
 }
 
 void AVoxelWorld::GetChunkWorldDimensions(int32& OutX, int32& OutY) const
@@ -225,12 +354,12 @@ bool AVoxelWorld::IsVoxelTransparent(const FIntVector& Coord) const
 	}
 
 	const Voxel& Voxel = GetVoxel(Coord);
-	if (Voxel.VoxelType.VoxelTypeId == FVoxelType::EmptyVoxelType)
+	if (Voxel.VoxelTypeId == EmptyVoxelType)
 	{
 		return true;
 	}
 
-	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(Voxel.VoxelType);
+	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(Voxel.VoxelTypeId);
 	check(VoxelData);
 	return VoxelData->bIsTransparent;
 }

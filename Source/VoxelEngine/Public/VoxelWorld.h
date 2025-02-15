@@ -12,7 +12,36 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "VoxelRenderingSettings.h"
+#include "VoxelChange.h"
 #include "VoxelWorld.generated.h"
+
+class AVoxelWorld;
+
+USTRUCT()
+struct VOXELENGINE_API FVoxelWorldSecondaryTickFunction : public FActorTickFunction
+{
+	GENERATED_USTRUCT_BODY()
+
+	class AVoxelWorld* Target;
+
+	virtual void ExecuteTick(
+		float DeltaTime,
+		ELevelTick TickType,
+		ENamedThreads::Type CurrentThread,
+		const FGraphEventRef& MyCompletionGraphEvent) override;
+
+	virtual FString DiagnosticMessage() override;
+};
+
+template<>
+struct TStructOpsTypeTraits<FVoxelWorldSecondaryTickFunction> : public TStructOpsTypeTraitsBase2<FVoxelWorldSecondaryTickFunction>
+{
+	enum
+	{
+		WithCopy = false
+	};
+};
+
 
 UCLASS()
 class VOXELENGINE_API AVoxelWorld : public AActor
@@ -27,6 +56,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled);
+
+	UFUNCTION(BlueprintCallable)
+	void RegenerateChunkMeshes();
 
 	UFUNCTION(BlueprintCallable)
 	FIntVector GetWorldSizeVoxel() const;
@@ -55,10 +87,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	UVoxelTypeSet* GetVoxelTypeSet() const;
 
-	virtual void Tick(float DeltaTime) override;
+	void Tick(float DeltaTime) override;
+	virtual void TickSecondary(float DeltaTime, ELevelTick LevelTick, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent, FVoxelWorldSecondaryTickFunction* TickFunction);
 
 	uint64 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
-	FIntVector DelinearizeCoordinate(int32 LinearCoord) const;
+	FIntVector DelinearizeCoordinate(uint64 LinearCoord) const;
+
+	FIntVector2 GetChunkCoordFromVoxelCoord(const FIntVector& Coord) const;
+	int32 GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) const;
 
 	const Voxel& GetVoxel(const FIntVector& Coord) const;
 
@@ -66,16 +102,22 @@ public:
 
 	Voxel& GetVoxel(int32 X, int32 Y, int32 Z);
 
+	bool IsValidCoordinate(const FIntVector& Coord) const;
+
+	// Thread-safe and lock-free way to change voxel type
+	EVoxelChangeResult ChangeVoxel(FVoxelChange& VoxelChange);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void PostInitProperties() override;
 
 private:
 	UPROPERTY(EditDefaultsOnly)
-	int32 ChunkSide = 16;
+	int32 ChunkSide = 32;
 
 	UPROPERTY(EditDefaultsOnly)
-	int32 WorldHeight = 16;
+	int32 WorldHeight = 32;
 
 	UPROPERTY(EditDefaultsOnly)
 	double VoxelSizeWorld = 100;
@@ -92,20 +134,23 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TArray<UVoxelChunk*> Chunks;
 
+	UPROPERTY(VisibleAnywhere, Category = Tick)
+	FVoxelWorldSecondaryTickFunction SecondaryActorTick;
+
 	UPROPERTY()
 	FIntVector2 ChunkWorldDimensions = FIntVector2(4, 4);
 
 	UPROPERTY()
-	UMaterialInstanceDynamic* DynamicMaterialInstance;
+	UMaterialInstanceDynamic* DynamicMaterialInstance = nullptr;
 
 	UPROPERTY()
-	UVoxelWorldGenerator* VoxelWorldGeneratorInstance;
+	UVoxelWorldGenerator* VoxelWorldGeneratorInstance = nullptr;
+
+	std::vector<Voxel> Voxels;
 
 	UFUNCTION()
 	void WorldGenerationFinishedCallback();
 
 	bool InitializeMaterials();
-
-	std::vector<Voxel> Voxels;
 
 };
