@@ -393,17 +393,9 @@ void UVoxelChunk::ProcessChangeRequest(const FVoxelChange& Request)
 
 	FIntVector LocalCoord = Request.Coordinate - ChunkMin;
 	int32 VoxelIndex = LinearizeCoordinate(LocalCoord.X, LocalCoord.Y, LocalCoord.Z);
-	bool bWasVisible = VisibleVoxelIndices[VoxelIndex];
-	bool bIsNowVisible = VoxelWorld->IsVoxelTransparent(Request.Coordinate);
-	if (bWasVisible == bIsNowVisible)
-	{
-		return;
-	}
 
 	UpdateVoxelVisibility(Request.Coordinate, true);
 
-	VisibleVoxelIndices[VoxelIndex] = bIsNowVisible;
-	
 	bIsMeshDirty = true;
 }
 
@@ -467,6 +459,10 @@ void UVoxelChunk::UpdateVoxelVisibility(const FIntVector& VoxelWorldCoord, bool 
 {
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	check(VoxelWorld);
+	if (!VoxelWorld->IsValidCoordinate(VoxelWorldCoord))
+	{
+		return;
+	}
 	UVoxelChunk* VoxelOwner = VoxelWorld->GetChunkFromVoxelCoord(VoxelWorldCoord);
 	if (VoxelOwner == this)
 	{
@@ -478,14 +474,14 @@ void UVoxelChunk::UpdateVoxelVisibility(const FIntVector& VoxelWorldCoord, bool 
 		int32 Index = LinearizeCoordinate(LocalCoord.X, LocalCoord.Y, LocalCoord.Z);
 		TStaticArray<bool, 6> SidesFlags;
 		int VisibleFacesNum = CheckVoxelSidesVisibility(VoxelWorldCoord, SidesFlags);
-		bool OldVisibility = VisibleVoxelIndices[Index];
-		bool NewVisibility = VisibleFacesNum > 0;
-		if (OldVisibility == NewVisibility)
+		bool bOldVisibility = VisibleVoxelIndices[Index];
+		bool bNewVisibility = !VoxelWorld->IsVoxelTransparent(VoxelWorldCoord) && VisibleFacesNum > 0;
+		if (bOldVisibility == bNewVisibility)
 		{
 			return;
 		}
 		
-		VisibleVoxelIndices[Index] = NewVisibility;
+		VisibleVoxelIndices[Index] = bNewVisibility;
 
 		if (!bUpdateNeighbours)
 		{
@@ -510,6 +506,7 @@ void UVoxelChunk::UpdateVoxelVisibility(const FIntVector& VoxelWorldCoord, bool 
 	else
 	{
 		VoxelOwner->UpdateVoxelVisibility(VoxelWorldCoord, bUpdateNeighbours);
+		VoxelOwner->bIsMeshDirty = true;
 	}
 }
 

@@ -4,9 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "VoxelType.h"
+#include "VoxelChange.generated.h"
 
-UENUM()
-enum class EVoxelChangeRenderPriority
+UENUM(BlueprintType)
+enum class EVoxelChangeRenderPriority : uint8
 {
 	// Voxel Change must happen inside method call
 	Immidiate,
@@ -16,15 +17,15 @@ enum class EVoxelChangeRenderPriority
 	AnyTime
 };
 
-UENUM()
-enum class EVoxelChangeExpectationMismatch
+UENUM(BlueprintType)
+enum class EVoxelChangeExpectationMismatch : uint8
 {
 	Reject = 0,
 	Overwrite = 1
 };
 
-UENUM()
-enum class EVoxelChangeResult
+UENUM(BlueprintType)
+enum class EVoxelChangeResult : uint8
 {
 	// Voxel change was executed and renderer was notified
 	Executed = 0,
@@ -32,14 +33,28 @@ enum class EVoxelChangeResult
 	Rejected = 2
 };
 
-/**
- * 
- */
+
 struct VOXELENGINE_API FVoxelChange
 {
 	FIntVector Coordinate{ 0, 0, 0 };
 	EVoxelChangeRenderPriority Priority = EVoxelChangeRenderPriority::AnyTime;
 	EVoxelChangeExpectationMismatch ExpectationMismatch = EVoxelChangeExpectationMismatch::Reject;
+
 	VoxelType ExpectedVoxelType = EmptyVoxelType;
 	VoxelType ChangeToVoxelType = EmptyVoxelType;
+
+	FVoxelChange()
+	{
+
+	}
+
+	FVoxelChange(const FIntVector& Coord, VoxelType Expected, VoxelType Desired):
+		Coordinate(Coord),
+		Priority(EVoxelChangeRenderPriority::AnyTime),
+		ExpectationMismatch(EVoxelChangeExpectationMismatch::Reject),
+		ExpectedVoxelType(Expected),
+		ChangeToVoxelType(Desired)
+	{
+
+	}
 };

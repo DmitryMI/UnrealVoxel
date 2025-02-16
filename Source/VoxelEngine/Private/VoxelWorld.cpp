@@ -63,7 +63,7 @@ void AVoxelWorld::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled)
 		return;
 	}
 
-	int32 ChunkIndex = ChunkY * ChunkWorldDimensions.X + ChunkX;
+	int32 ChunkIndex = LinearizeChunkCoordinate(FIntVector2(ChunkX, ChunkY));
 	Chunks[ChunkIndex]->SetDrawWireframe(bEnabled);
 }
 
@@ -151,9 +151,10 @@ void AVoxelWorld::WorldGenerationFinishedCallback()
 {
 	UE_LOG(LogVoxelEngine, Display, TEXT("Spawning Chunk components..."));
 	FDateTime ChunkSpawnStartTime = FDateTime::Now();
-	for (int32 X = 0; X < ChunkWorldDimensions.X; X++)
+	Chunks.SetNum(ChunkWorldDimensions.X * ChunkWorldDimensions.Y);
+	for (int32 Y = 0; Y < ChunkWorldDimensions.Y; Y++)
 	{
-		for (int32 Y = 0; Y < ChunkWorldDimensions.Y; Y++)
+		for (int32 X = 0; X < ChunkWorldDimensions.X; X++)
 		{
 			UVoxelChunk* Chunk = NewObject<UVoxelChunk>(this);
 			check(Chunk);
@@ -163,7 +164,7 @@ void AVoxelWorld::WorldGenerationFinishedCallback()
 			FAttachmentTransformRules Rules(EAttachmentRule::KeepRelative, false);
 			Chunk->AttachToComponent(RootComponent, Rules);
 			AddOwnedComponent(Chunk);
-			Chunks.Add(Chunk);
+			Chunks[LinearizeChunkCoordinate(FIntVector2(X, Y))] = Chunk;
 		}
 	}
 	FDateTime ChunkSpawnEndTime = FDateTime::Now();
@@ -233,6 +234,24 @@ FIntVector AVoxelWorld::DelinearizeCoordinate(uint64 LinearCoord) const
 	return FIntVector(X, Y, Z);
 }
 
+uint64 AVoxelWorld::LinearizeChunkCoordinate(const FIntVector2& ChunkCoord) const
+{
+	checkSlow(0 <= ChunkCoord.X && ChunkCoord.X <= ChunkWorldDimensions.X);
+	checkSlow(0 <= ChunkCoord.Y && ChunkCoord.Y <= ChunkWorldDimensions.Y);
+	uint64 Result =
+		static_cast<size_t>(ChunkCoord.Y * ChunkWorldDimensions.X) +
+		static_cast<size_t>(ChunkCoord.X);
+	checkSlow(Result < Chunks.Num());
+	return Result;
+}
+
+FIntVector2 AVoxelWorld::DelinearizeChunkCoordinate(uint64 LinearCoord) const
+{
+	int32 X = LinearCoord % ChunkWorldDimensions.X;
+	int32 Y = LinearCoord / (ChunkWorldDimensions.X) % (ChunkWorldDimensions.Y);
+	return FIntVector2(X, Y);
+}
+
 FIntVector2 AVoxelWorld::GetChunkCoordFromVoxelCoord(const FIntVector& Coord) const
 {
 	int32 ChunkX = Coord.X / ChunkSide;
@@ -241,15 +260,16 @@ FIntVector2 AVoxelWorld::GetChunkCoordFromVoxelCoord(const FIntVector& Coord) co
 	return FIntVector2(ChunkX, ChunkY);
 }
 
-int32 AVoxelWorld::GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) const
-{
-	int32 ChunkIndex = ChunkCoord.Y * ChunkWorldDimensions.X + ChunkCoord.X;
-	return ChunkIndex;
-}
 
 UVoxelChunk* AVoxelWorld::GetChunkFromVoxelCoord(const FIntVector& Coord) const
 {
-	return Chunks[GetChunkIndexFromChunkCoord(GetChunkCoordFromVoxelCoord(Coord))];
+	FIntVector2 ChunkCoord = GetChunkCoordFromVoxelCoord(Coord);
+	uint64 Index = LinearizeChunkCoordinate(ChunkCoord);
+	if (Index >= Chunks.Num())
+	{
+		return nullptr;
+	}
+	return Chunks[Index];
 }
 
 const Voxel& AVoxelWorld::GetVoxel(const FIntVector& Coord) const
@@ -309,10 +329,21 @@ EVoxelChangeResult AVoxelWorld::ChangeVoxel(FVoxelChange& VoxelChange)
 		}
 	}
 
-	int32 VoxelChunkIndex = GetChunkIndexFromChunkCoord(GetChunkCoordFromVoxelCoord(VoxelChange.Coordinate));
+	uint64 VoxelChunkIndex = LinearizeChunkCoordinate(GetChunkCoordFromVoxelCoord(VoxelChange.Coordinate));
 	check(0 <= VoxelChunkIndex && VoxelChunkIndex < Chunks.Num());
 	UVoxelChunk* Chunk = Chunks[VoxelChunkIndex];
 	return Chunk->ChangeVoxelRendering(VoxelChange);
+}
+
+EVoxelChangeResult AVoxelWorld::ChangeVoxel(const FIntVector& Coord, int32 DesiredVoxelType)
+{
+	if (!IsValidCoordinate(Coord))
+	{
+		return EVoxelChangeResult::Rejected;
+	}
+	VoxelType Expected = GetVoxel(Coord).VoxelTypeId;
+	FVoxelChange ChangeRequest(Coord, Expected, DesiredVoxelType);
+	return ChangeVoxel(ChangeRequest);
 }
 
 void AVoxelWorld::GetChunkWorldDimensions(int32& OutX, int32& OutY) const

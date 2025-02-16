@@ -97,8 +97,10 @@ public:
 	uint64 LinearizeCoordinate(int32 X, int32 Y, int32 Z) const;
 	FIntVector DelinearizeCoordinate(uint64 LinearCoord) const;
 
+	uint64 LinearizeChunkCoordinate(const FIntVector2& ChunkCoord) const;
+	FIntVector2 DelinearizeChunkCoordinate(uint64 LinearCoord) const;
+
 	FIntVector2 GetChunkCoordFromVoxelCoord(const FIntVector& Coord) const;
-	int32 GetChunkIndexFromChunkCoord(const FIntVector2& ChunkCoord) const;
 	UVoxelChunk* GetChunkFromVoxelCoord(const FIntVector& Coord) const;
 
 	const Voxel& GetVoxel(const FIntVector& Coord) const;
@@ -111,6 +113,10 @@ public:
 
 	// Thread-safe and lock-free way to change voxel type
 	EVoxelChangeResult ChangeVoxel(FVoxelChange& VoxelChange);
+
+	// Thread-safe and lock-free way to change voxel type. Exposed to Blueprints.
+	UFUNCTION(BlueprintCallable)
+	EVoxelChangeResult ChangeVoxel(const FIntVector& Coord, int32 DesiredVoxelType);
 
 protected:
 	// Called when the game starts or when spawned
