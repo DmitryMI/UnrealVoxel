@@ -1,6 +1,6 @@
 
 ## Voxel Engine TODO List
-- [ ] Dynamic rendering
+- [x] Dynamic rendering
 - [ ] Terrain Collision System
 - [ ] Basic Movement Component
 - [ ] Navigation System
