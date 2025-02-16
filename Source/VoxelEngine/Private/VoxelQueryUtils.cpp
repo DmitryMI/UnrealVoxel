@@ -1,8 +1,12 @@
-// https://github.com/cgyurgyik/fast-voxel-traversal-algorithm/blob/master/amanatidesWooAlgorithm.cpp
+// Based on https://github.com/cgyurgyik/fast-voxel-traversal-algorithm/blob/master/amanatidesWooAlgorithm.cpp
+
+#define VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES (WITH_EDITOR && 0)
 
 #include "VoxelQueryUtils.h"
 #include "VoxelEngine/VoxelEngine.h"
+#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
 #include "DrawDebugHelpers.h"
+#endif
 
 bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, const FVoxelLineTraceFilterParams& Params, FIntVector& OutHitCoord)
 {
@@ -12,117 +16,48 @@ bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const
 	{
 		return false;
 	}
-	double VoxelWorldSize = VoxelWorld->GetVoxelSizeWorld();
-
-	FIntVector CurrentVoxel = VoxelWorld->GetVoxelCoordFromWorld(Start);
-	if (Params.bIncludeInitialVoxel && CheckIfVoxelSatisfiesFilter(VoxelWorld, CurrentVoxel, Params))
+	
+	if (Direction.IsNearlyZero())
 	{
-		OutHitCoord = CurrentVoxel;
-		return true;
+		return false;
 	}
-	FVector FirstVoxelCenterWorld = VoxelWorld->GetVoxelCenterWorld(CurrentVoxel);
-	FIntVector PreviousVoxel = CurrentVoxel;
-	FVector PreviousVoxelCenterWorld = VoxelWorld->GetVoxelCenterWorld(PreviousVoxel);
-	FVector DebugVoxelExtent = FVector(VoxelWorldSize, VoxelWorldSize, VoxelWorldSize) / 2;
-	DrawDebugBox(VoxelWorld->GetWorld(), FirstVoxelCenterWorld, DebugVoxelExtent, FColor::Emerald, false, -1, 0, 4);
-
-	FVector DirectionNormalized = Direction.GetSafeNormal();
-	FVector EndPoint = Start + DirectionNormalized * Params.MaxDistance;
-	FIntVector EndVoxel = VoxelWorld->GetVoxelCoordFromWorld(EndPoint);
-
-	DrawDebugBox(VoxelWorld->GetWorld(), VoxelWorld->GetVoxelCenterWorld(EndVoxel), DebugVoxelExtent, FColor::Magenta, false, -1, 0, 4);
-
-	FIntVector Step{ 0, 0, 0 };
-	FVector Delta{ 0, 0, 0 };
-	FVector NextIntersection{ 0, 0, 0 };
-	TStaticArray<bool, 3> DirectionValid{ false, false, false };
-
-	if (DirectionNormalized.X > 0)
+	FVector DirectionNormalized;
+	if (Direction.IsNormalized())
 	{
-		Step.X = 1;
-		Delta.X = VoxelWorldSize / DirectionNormalized.X;
-		NextIntersection.X = (FirstVoxelCenterWorld.X - Start.X) / DirectionNormalized.X;
-		DirectionValid[0] = true;
+		DirectionNormalized = Direction;
 	}
-	else if(DirectionNormalized.X < 0)
+	else
 	{
-		Step.X = -1;
-		Delta.X = VoxelWorldSize / -DirectionNormalized.X;
-		NextIntersection.X = (PreviousVoxelCenterWorld.X - Start.X) / DirectionNormalized.X;
-		DirectionValid[0] = true;
+		DirectionNormalized = Direction.GetUnsafeNormal();
 	}
+	
+	ensureMsgf(Params.MaxDistance > 0, TEXT("MaxDistance must be greater then zero"));
 
-	if (DirectionNormalized.Y > 0)
-	{
-		Step.Y = 1;
-		Delta.Y = VoxelWorldSize / DirectionNormalized.Y;
-		NextIntersection.Y = (FirstVoxelCenterWorld.Y - Start.Y) / DirectionNormalized.Y;
-		DirectionValid[1] = true;
-	}
-	else if (DirectionNormalized.Y < 0)
-	{
-		Step.Y = -1;
-		Delta.Y = VoxelWorldSize / -DirectionNormalized.Y;
-		NextIntersection.Y = (PreviousVoxelCenterWorld.Y - Start.Y) / DirectionNormalized.Y;
-		DirectionValid[1] = true;
-	}
+#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
+	FVector LineEnd = Start + Params.MaxDistance * DirectionNormalized;
+	DrawDebugLine(VoxelWorld->GetWorld(), Start, LineEnd, FColor::Red);
+#endif
 
-	if (DirectionNormalized.Z > 0)
-	{
-		Step.Z = 1;
-		Delta.Z = VoxelWorldSize / DirectionNormalized.Z;
-		NextIntersection.Z = (FirstVoxelCenterWorld.Z - Start.Z) / DirectionNormalized.Z;
-		DirectionValid[2] = true;
-	}
-	else if (DirectionNormalized.Z < 0)
-	{
-		Step.Z = -1;
-		Delta.Z = VoxelWorldSize / -DirectionNormalized.Z;
-		NextIntersection.Z = (PreviousVoxelCenterWorld.Z - Start.Z) / DirectionNormalized.Z;
-		DirectionValid[2] = true;
-	}
+	FVector StartAdjusted = Start - FVector(VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld());
+	
+	bool bHasValue = false;
 
-	bool bIsValidCoordinate = VoxelWorld->IsValidCoordinate(CurrentVoxel);
-	while (VoxelWorld->IsValidCoordinate(CurrentVoxel) && (Params.MaxDistance <= 0 || CurrentVoxel != EndVoxel))
-	{
-		TArray<int> MinComponents = GetMinComponent(NextIntersection,
-			{ 
-				DirectionNormalized.X != 0,
-				DirectionNormalized.Y != 0,
-				DirectionNormalized.Z != 0
-			}
-		);
-
-		for (int I : MinComponents)
+	auto VoxelCallback = [VoxelWorld, Params, &OutHitCoord, &bHasValue](const FIntVector& Voxel)
 		{
-			if (I == 0)
+			if (CheckIfVoxelSatisfiesFilter(VoxelWorld, Voxel, Params))
 			{
-				CurrentVoxel.X += Step.X;
-				NextIntersection.X += Delta.X;
+				OutHitCoord = Voxel;
+				bHasValue = true;
+				return false;
 			}
-			else if (I == 1)
-			{
-				CurrentVoxel.Y += Step.Y;
-				NextIntersection.Y += Delta.Y;
-			}
-			else if (I == 2)
-			{
-				CurrentVoxel.Z += Step.Z;
-				NextIntersection.Z += Delta.Z;
-			}
-			break;
-		}
+			return true;
+		};
 
-		if (!CheckIfVoxelSatisfiesFilter(VoxelWorld, CurrentVoxel, Params))
-		{
-			continue;
-		}
+	FAmanatidesWooAlgorithmVoxelCallback Callback = FAmanatidesWooAlgorithmVoxelCallback::CreateLambda(VoxelCallback);
 
-		OutHitCoord = CurrentVoxel;
-		return true;
-	}
+	AmanatidesWooAlgorithm(VoxelWorld, StartAdjusted, DirectionNormalized, 0, 1, Callback);
 
-	return false;
+	return bHasValue;
 }
 
 bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params)
@@ -131,12 +66,16 @@ bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, cons
 	{
 		return false;
 	}
+
 	Voxel& Voxel = VoxelWorld->GetVoxel(Coord);
+
 	if (Voxel.VoxelTypeId == EmptyVoxelType)
 	{
+#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
 		FVector Location = VoxelWorld->GetVoxelCenterWorld(Coord);
 		FVector Extent = FVector(VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld()) / 2;
 		DrawDebugBox(VoxelWorld->GetWorld(), Location, Extent, FColor::Cyan);
+#endif
 		return false;
 	}
 
@@ -173,9 +112,11 @@ bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, cons
 		Color = FColor::Red;
 	}
 
+#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
 	FVector Location = VoxelWorld->GetVoxelCenterWorld(Coord);
 	FVector Extent = FVector(VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld()) / 2;
 	DrawDebugBox(VoxelWorld->GetWorld(), Location, Extent, Color);
+#endif
 	return bPass;
 }
 
@@ -211,4 +152,183 @@ TArray<int> UVoxelQueryUtils::GetMinComponent(const FVector& Values, const TStat
 
 	}
 	return Result;
+}
+
+bool UVoxelQueryUtils::RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double& TMin, double& TMax, double T0, double T1) noexcept
+{
+	FVector GridMinBound = VoxelWorld->GetActorLocation();
+	FVector GridMaxBound = VoxelWorld->GetActorLocation() + FVector(VoxelWorld->GetWorldSizeVoxel()) * VoxelWorld->GetVoxelSizeWorld();
+	double TyMin, TyMax, TzMin, TzMax;
+	const double XInvDir = 1 / Direction.X;
+	if (XInvDir >= 0) 
+	{
+		TMin = (GridMinBound.X - Start.X) * XInvDir;
+		TMax = (GridMaxBound.X - Start.X) * XInvDir;
+	}
+	else
+	{
+		TMin = (GridMaxBound.X -Start.X) * XInvDir;
+		TMax = (GridMinBound.X -Start.X) * XInvDir;
+	}
+
+	const double YInvDir = 1 / Direction.Y;
+	if (YInvDir >= 0)
+	{
+		TyMin = (GridMinBound.Y - Start.Y) * YInvDir;
+		TyMax = (GridMaxBound.Y - Start.Y) * YInvDir;
+	}
+	else {
+		TyMin = (GridMaxBound.Y - Start.Y) * YInvDir;
+		TyMax = (GridMinBound.Y - Start.Y) * YInvDir;
+	}
+
+	if (TMin > TyMax || TyMin > TMax) return false;
+	if (TyMin > TMin) TMin = TyMin;
+	if (TyMax < TMax) TMax = TyMax;
+
+	const double ZInvDir = 1 / Direction.Z;
+	if (ZInvDir >= 0)
+	{
+		TzMin = (GridMinBound.Z - Start.Z) * ZInvDir;
+		TzMax = (GridMaxBound.Z - Start.Z) * ZInvDir;
+	}
+	else
+	{
+		TzMin = (GridMaxBound.Z - Start.Z) * ZInvDir;
+		TzMax = (GridMinBound.Z - Start.Z) * ZInvDir;
+	}
+
+	if (TMin > TzMax || TzMin > TMax) return false;
+	if (TzMin > TMin) TMin = TzMin;
+	if (TzMax < TMax) TMax = TzMax;
+	return (TMin < T1 && TMax > T0);
+}
+
+void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double T0, double T1, const FAmanatidesWooAlgorithmVoxelCallback& Callback) noexcept
+{
+	if (!Callback.IsBound())
+	{
+		return;
+	}
+
+	FVector GridMinBound = VoxelWorld->GetActorLocation();
+	FVector GridMaxBound = VoxelWorld->GetActorLocation() + FVector(VoxelWorld->GetWorldSizeVoxel()) * VoxelWorld->GetVoxelSizeWorld();
+
+	double TMin;
+	double TMax;
+	const bool RayIntersectsGrid = RayBoxIntersection(VoxelWorld, Start, Direction, TMin, TMax, T0, T1);
+	if (!RayIntersectsGrid) return;
+
+	TMin = FMath::Max(TMin, T0);
+	TMax = FMath::Max(TMax, T1);
+	const FVector RayStart = Start + Direction * TMin;
+	const FVector RayEnd = Start + Direction * TMax;
+
+	size_t CurrentXIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld()));
+	const size_t EndXIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld()));
+	int StepX;
+	double TDeltaX;
+	double TMaxX;
+	if (Direction.X > 0.0) 
+	{
+		StepX = 1;
+		TDeltaX = VoxelWorld->GetVoxelSizeWorld() / Direction.X;
+		TMaxX = TMin + (GridMinBound.X + CurrentXIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.X) / Direction.X;
+	}
+	else if (Direction.X < 0.0) 
+	{
+		StepX = -1;
+		TDeltaX = VoxelWorld->GetVoxelSizeWorld() / -Direction.X;
+		const size_t PreviousXIndex = CurrentXIndex - 1;
+		TMaxX = TMin + (GridMinBound.X + PreviousXIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.X) / Direction.X;
+	}
+	else {
+		StepX = 0;
+		TDeltaX = TMax;
+		TMaxX = TMax;
+	}
+
+	size_t CurrentYIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld()));
+	const size_t EndYIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld()));
+	int StepY;
+	double TDeltaY;
+	double TMaxY;
+	if (Direction.Y > 0.0)
+	{
+		StepY = 1;
+		TDeltaY = VoxelWorld->GetVoxelSizeWorld() / Direction.Y;
+		TMaxY = TMin + (GridMinBound.Y + CurrentYIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.Y) / Direction.Y;
+	}
+	else if (Direction.Y < 0.0)
+	{
+		StepY = -1;
+		TDeltaY = VoxelWorld->GetVoxelSizeWorld() / -Direction.Y;
+		const size_t PreviousYIndex = CurrentYIndex - 1;
+		TMaxY = TMin + (GridMinBound.Y + PreviousYIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.Y) / Direction.Y;
+	}
+	else 
+	{
+		StepY = 0;
+		TDeltaY = TMax;
+		TMaxY = TMax;
+	}
+
+	size_t CurrentZIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld()));
+	const size_t EndZIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld()));
+	int StepZ;
+	double TDeltaZ;
+	double TMaxZ;
+	if (Direction.Z > 0.0) 
+	{
+		StepZ = 1;
+		TDeltaZ = VoxelWorld->GetVoxelSizeWorld() / Direction.Z;
+		TMaxZ = TMin + (GridMinBound.Z + CurrentZIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.Z) / Direction.Z;
+	}
+	else if (Direction.Z < 0.0) 
+	{
+		StepZ = -1;
+		TDeltaZ = VoxelWorld->GetVoxelSizeWorld() / -Direction.Z;
+		const size_t PreviousZIndex = CurrentZIndex - 1;
+		TMaxZ = TMin + (GridMinBound.Z + PreviousZIndex * VoxelWorld->GetVoxelSizeWorld()
+			- RayStart.Z) / Direction.Z;
+	}
+	else 
+	{
+		StepZ = 0;
+		TDeltaZ = TMax;
+		TMaxZ = TMax;
+	}
+
+	while (CurrentXIndex != EndXIndex || CurrentYIndex != EndYIndex || CurrentZIndex != EndZIndex)
+	{
+		FIntVector CurrentVoxel(CurrentXIndex, CurrentYIndex, CurrentZIndex);
+		if (!Callback.Execute(CurrentVoxel))
+		{
+			return;
+		}
+
+		if (TMaxX < TMaxY && TMaxX < TMaxZ) {
+			// X-axis traversal.
+			CurrentXIndex += StepX;
+			TMaxX += TDeltaX;
+		}
+		else if (TMaxY < TMaxZ) {
+			// Y-axis traversal.
+			CurrentYIndex += StepY;
+			TMaxY += TDeltaY;
+		}
+		else {
+			// Z-axis traversal.
+			CurrentZIndex += StepZ;
+			TMaxZ += TDeltaZ;
+		}
+	}
+
+	FIntVector EndVoxel(EndXIndex, EndYIndex, EndZIndex);
+	Callback.Execute(EndVoxel);
 }

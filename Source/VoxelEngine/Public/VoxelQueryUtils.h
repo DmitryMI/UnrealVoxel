@@ -33,6 +33,8 @@ struct FVoxelLineTraceFilterParams
 	bool bIncludeInitialVoxel = true;
 };
 
+DECLARE_DELEGATE_RetVal_OneParam(bool, FAmanatidesWooAlgorithmVoxelCallback, const FIntVector&);
+
 UCLASS()
 class VOXELENGINE_API UVoxelQueryUtils : public UBlueprintFunctionLibrary
 {
@@ -47,4 +49,9 @@ private:
 	static bool CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld,const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params);
 
 	static TArray<int> GetMinComponent(const FVector& Values, const TStaticArray<bool, 3>& ValidityFlags);
+
+	static bool RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double& tMin, double& tMax,
+		double t0, double t1) noexcept;
+
+	static void AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double t0, double t1, const FAmanatidesWooAlgorithmVoxelCallback& Callback) noexcept;
 };
