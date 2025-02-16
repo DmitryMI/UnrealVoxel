@@ -321,11 +321,11 @@ EVoxelChangeResult AVoxelWorld::ChangeVoxel(FVoxelChange& VoxelChange)
 
 		}
 	}
-	else if (VoxelChange.ExpectationMismatch == EVoxelChangeExpectationMismatch::Reject)
+	else if (VoxelChange.ExpectationMismatch == EVoxelChangeExpectationMismatch::Cancel)
 	{
 		if (!TargetVoxel.VoxelTypeId.compare_exchange_strong(VoxelChange.ExpectedVoxelType, VoxelChange.ChangeToVoxelType))
 		{
-			return EVoxelChangeResult::Rejected;
+			return EVoxelChangeResult::ExpectationMismatch;
 		}
 	}
 

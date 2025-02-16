@@ -20,7 +20,7 @@ enum class EVoxelChangeRenderPriority : uint8
 UENUM(BlueprintType)
 enum class EVoxelChangeExpectationMismatch : uint8
 {
-	Reject = 0,
+	Cancel = 0,
 	Overwrite = 1
 };
 
@@ -29,6 +29,8 @@ enum class EVoxelChangeResult : uint8
 {
 	// Voxel change was executed and renderer was notified
 	Executed = 0,
+	// Request was valid, but voxel type in memory did not match the expected type. Retry the request with updated expectation.
+	ExpectationMismatch = 1,
 	// Voxel change is invalid, do not retry the same request.
 	Rejected = 2
 };
@@ -38,7 +40,7 @@ struct VOXELENGINE_API FVoxelChange
 {
 	FIntVector Coordinate{ 0, 0, 0 };
 	EVoxelChangeRenderPriority Priority = EVoxelChangeRenderPriority::AnyTime;
-	EVoxelChangeExpectationMismatch ExpectationMismatch = EVoxelChangeExpectationMismatch::Reject;
+	EVoxelChangeExpectationMismatch ExpectationMismatch = EVoxelChangeExpectationMismatch::Cancel;
 
 	VoxelType ExpectedVoxelType = EmptyVoxelType;
 	VoxelType ChangeToVoxelType = EmptyVoxelType;
@@ -51,7 +53,7 @@ struct VOXELENGINE_API FVoxelChange
 	FVoxelChange(const FIntVector& Coord, VoxelType Expected, VoxelType Desired):
 		Coordinate(Coord),
 		Priority(EVoxelChangeRenderPriority::AnyTime),
-		ExpectationMismatch(EVoxelChangeExpectationMismatch::Reject),
+		ExpectationMismatch(EVoxelChangeExpectationMismatch::Cancel),
 		ExpectedVoxelType(Expected),
 		ChangeToVoxelType(Desired)
 	{
