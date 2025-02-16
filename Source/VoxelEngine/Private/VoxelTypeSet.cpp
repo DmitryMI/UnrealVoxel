@@ -28,7 +28,7 @@ UVoxelData* UVoxelTypeSet::GetVoxelDataByTypeId(int32 VoxelTypeId) const
 	return GetVoxelDataByType(VoxelTypeId);
 }
 
-FVoxelType UVoxelTypeSet::GetVoxelTypeByName(const FName& VoxelName) const
+VoxelType UVoxelTypeSet::GetVoxelTypeByName(const FName& VoxelName) const
 {
 	for (int I = 0; I < VoxelTypes.Num(); I++)
 	{
@@ -38,14 +38,14 @@ FVoxelType UVoxelTypeSet::GetVoxelTypeByName(const FName& VoxelName) const
 		}
 	}
 
-	return FVoxelType::EmptyVoxelType;
+	return EmptyVoxelType;
 }
 
-UVoxelData* UVoxelTypeSet::GetVoxelDataByType(FVoxelType VoxelType) const
+UVoxelData* UVoxelTypeSet::GetVoxelDataByType(VoxelType VoxelType) const
 {
-	check(VoxelType.VoxelTypeId != FVoxelType::EmptyVoxelType);
-	check(VoxelTypes.Num() > VoxelType.VoxelTypeId - 1);
-	return VoxelTypes[VoxelType.VoxelTypeId - 1];
+	check(VoxelType != EmptyVoxelType);
+	check(VoxelTypes.Num() > VoxelType - 1);
+	return VoxelTypes[VoxelType - 1];
 }
 
 #if WITH_EDITOR

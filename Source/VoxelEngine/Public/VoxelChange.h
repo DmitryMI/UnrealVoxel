@@ -1,0 +1,60 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "VoxelType.h"
+#include "VoxelChange.generated.h"
+
+UENUM(BlueprintType)
+enum class EVoxelChangeRenderPriority : uint8
+{
+	// Voxel Change must happen inside method call
+	Immidiate,
+	// Voxel Change must happen during the same frame as the method call
+	SameFrame,
+	// Voxel Change may happen any time
+	AnyTime
+};
+
+UENUM(BlueprintType)
+enum class EVoxelChangeExpectationMismatch : uint8
+{
+	Reject = 0,
+	Overwrite = 1
+};
+
+UENUM(BlueprintType)
+enum class EVoxelChangeResult : uint8
+{
+	// Voxel change was executed and renderer was notified
+	Executed = 0,
+	// Voxel change is invalid, do not retry the same request.
+	Rejected = 2
+};
+
+
+struct VOXELENGINE_API FVoxelChange
+{
+	FIntVector Coordinate{ 0, 0, 0 };
+	EVoxelChangeRenderPriority Priority = EVoxelChangeRenderPriority::AnyTime;
+	EVoxelChangeExpectationMismatch ExpectationMismatch = EVoxelChangeExpectationMismatch::Reject;
+
+	VoxelType ExpectedVoxelType = EmptyVoxelType;
+	VoxelType ChangeToVoxelType = EmptyVoxelType;
+
+	FVoxelChange()
+	{
+
+	}
+
+	FVoxelChange(const FIntVector& Coord, VoxelType Expected, VoxelType Desired):
+		Coordinate(Coord),
+		Priority(EVoxelChangeRenderPriority::AnyTime),
+		ExpectationMismatch(EVoxelChangeExpectationMismatch::Reject),
+		ExpectedVoxelType(Expected),
+		ChangeToVoxelType(Desired)
+	{
+
+	}
+};

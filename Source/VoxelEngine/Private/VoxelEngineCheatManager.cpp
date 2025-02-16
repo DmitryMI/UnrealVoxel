@@ -4,6 +4,7 @@
 #include "VoxelEngineCheatManager.h"
 #include "VoxelWorld.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/DateTime.h"
 
 void UVoxelEngineCheatManager::DrawChunkWireframes(bool bEnabled)
 {
@@ -39,4 +40,14 @@ void UVoxelEngineCheatManager::DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bo
 	{
 		UE_LOG(LogTemp, Display, TEXT("Disabled drawing Voxel Chunk (%d, %d) wireframe"), ChunkX, ChunkY);
 	}
+}
+
+void UVoxelEngineCheatManager::RegenerateChunkMeshes()
+{
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AVoxelWorld::StaticClass(), FoundActors);
+	check(FoundActors.Num() == 1);
+	AVoxelWorld* VoxelWorld = Cast<AVoxelWorld>(FoundActors[0]);
+
+	VoxelWorld->RegenerateChunkMeshes();
 }

@@ -20,4 +20,7 @@ public:
 
 	UFUNCTION(Exec)
 	void DrawChunkWireframe(int32 ChunkX, int32 ChunkY, bool bEnabled);
+
+	UFUNCTION(Exec)
+	void RegenerateChunkMeshes();
 };
