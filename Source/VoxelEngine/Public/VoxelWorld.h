@@ -86,6 +86,9 @@ public:
 	FVector GetVoxelCenterWorld(const FIntVector& Coord) const;
 
 	UFUNCTION(BlueprintCallable)
+	FIntVector GetVoxelCoordFromWorld(const FVector& Location) const;
+
+	UFUNCTION(BlueprintCallable)
 	UVoxelTypeSet* GetVoxelTypeSet() const;
 
 	void Tick(float DeltaTime) override;

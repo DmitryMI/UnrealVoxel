@@ -271,17 +271,17 @@ Voxel& AVoxelWorld::GetVoxel(int32 X, int32 Y, int32 Z)
 
 bool AVoxelWorld::IsValidCoordinate(const FIntVector& Coord) const
 {
-	bool bIsValid = (0 <= Coord.X && Coord.X <= ChunkWorldDimensions.X * ChunkSide);
+	bool bIsValid = (0 <= Coord.X && Coord.X < ChunkWorldDimensions.X * ChunkSide);
 	if (!bIsValid)
 	{
 		return false;
 	}
-	bIsValid = (0 <= Coord.Y && Coord.Y <= ChunkWorldDimensions.Y * ChunkSide);
+	bIsValid = (0 <= Coord.Y && Coord.Y < ChunkWorldDimensions.Y * ChunkSide);
 	if (!bIsValid)
 	{
 		return false;
 	}
-	bIsValid = (0 <= Coord.Z && Coord.Z <= WorldHeight);
+	bIsValid = (0 <= Coord.Z && Coord.Z < WorldHeight);
 	return bIsValid;
 }
 
@@ -373,7 +373,14 @@ UMaterialInterface* AVoxelWorld::GetVoxelChunkMaterial() const
 
 FVector AVoxelWorld::GetVoxelCenterWorld(const FIntVector& Coord) const
 {
-	return GetActorLocation() + VoxelSizeWorld * FVector(Coord.X, Coord.Y, Coord.Z) * 1.5;
+	return GetActorLocation() + VoxelSizeWorld * FVector(Coord.X, Coord.Y, Coord.Z) + VoxelSizeWorld / 2;
+}
+
+FIntVector AVoxelWorld::GetVoxelCoordFromWorld(const FVector& Location) const
+{
+	FVector LocationScaled = (Location - GetActorLocation()) / VoxelSizeWorld;
+	// return FIntVector(FMath::RoundToInt(LocationScaled.X), FMath::RoundToInt(LocationScaled.Y), FMath::RoundToInt(LocationScaled.Z));
+	return FIntVector(LocationScaled.X, LocationScaled.Y, LocationScaled.Z);
 }
 
 UVoxelTypeSet* AVoxelWorld::GetVoxelTypeSet() const
