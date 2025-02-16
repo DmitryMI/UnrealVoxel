@@ -55,7 +55,7 @@ bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const
 
 	FAmanatidesWooAlgorithmVoxelCallback Callback = FAmanatidesWooAlgorithmVoxelCallback::CreateLambda(VoxelCallback);
 
-	AmanatidesWooAlgorithm(VoxelWorld, StartAdjusted, DirectionNormalized, 0, 1, Callback);
+	AmanatidesWooAlgorithm(VoxelWorld, StartAdjusted, DirectionNormalized, Params.MaxDistance, Callback);
 
 	return bHasValue;
 }
@@ -154,10 +154,19 @@ TArray<int> UVoxelQueryUtils::GetMinComponent(const FVector& Values, const TStat
 	return Result;
 }
 
-bool UVoxelQueryUtils::RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double& TMin, double& TMax, double T0, double T1) noexcept
+bool UVoxelQueryUtils::RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double MaxDistance, double& TMin, double& TMax, double T0, double T1) noexcept
 {
-	FVector GridMinBound = VoxelWorld->GetActorLocation();
-	FVector GridMaxBound = VoxelWorld->GetActorLocation() + FVector(VoxelWorld->GetWorldSizeVoxel()) * VoxelWorld->GetVoxelSizeWorld();
+	FVector End = Start + Direction * MaxDistance;
+	FVector GridMinBound;
+	FVector GridMaxBound;
+	GridMinBound.X = FMath::Min(Start.X, End.X);
+	GridMinBound.Y = FMath::Min(Start.Y, End.Y);
+	GridMinBound.Z = FMath::Min(Start.Z, End.Z);
+	
+	GridMaxBound.X = FMath::Max(Start.X, End.X);
+	GridMaxBound.Y = FMath::Max(Start.Y, End.Y);
+	GridMaxBound.Z = FMath::Max(Start.Z, End.Z);
+
 	double TyMin, TyMax, TzMin, TzMax;
 	const double XInvDir = 1 / Direction.X;
 	if (XInvDir >= 0) 
@@ -204,7 +213,7 @@ bool UVoxelQueryUtils::RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector
 	return (TMin < T1 && TMax > T0);
 }
 
-void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double T0, double T1, const FAmanatidesWooAlgorithmVoxelCallback& Callback) noexcept
+void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double MaxDistance, const FAmanatidesWooAlgorithmVoxelCallback& Callback) noexcept
 {
 	if (!Callback.IsBound())
 	{
@@ -214,18 +223,23 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 	FVector GridMinBound = VoxelWorld->GetActorLocation();
 	FVector GridMaxBound = VoxelWorld->GetActorLocation() + FVector(VoxelWorld->GetWorldSizeVoxel()) * VoxelWorld->GetVoxelSizeWorld();
 
+	constexpr double T0 = 0;
+	constexpr double T1 = 1;
 	double TMin;
 	double TMax;
-	const bool RayIntersectsGrid = RayBoxIntersection(VoxelWorld, Start, Direction, TMin, TMax, T0, T1);
-	if (!RayIntersectsGrid) return;
+	const bool RayIntersectsGrid = RayBoxIntersection(VoxelWorld, Start, Direction, MaxDistance, TMin, TMax, T0, T1);
+	if (!RayIntersectsGrid)
+	{
+		return;
+	}
 
 	TMin = FMath::Max(TMin, T0);
 	TMax = FMath::Max(TMax, T1);
 	const FVector RayStart = Start + Direction * TMin;
 	const FVector RayEnd = Start + Direction * TMax;
 
-	size_t CurrentXIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld()));
-	const size_t EndXIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld()));
+	int64 CurrentXIndex = FMath::CeilToInt64((RayStart.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld());
+	int64 EndXIndex = FMath::CeilToInt64((RayEnd.X - GridMinBound.X) / VoxelWorld->GetVoxelSizeWorld());
 	int StepX;
 	double TDeltaX;
 	double TMaxX;
@@ -240,7 +254,7 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 	{
 		StepX = -1;
 		TDeltaX = VoxelWorld->GetVoxelSizeWorld() / -Direction.X;
-		const size_t PreviousXIndex = CurrentXIndex - 1;
+		int64 PreviousXIndex = CurrentXIndex - 1;
 		TMaxX = TMin + (GridMinBound.X + PreviousXIndex * VoxelWorld->GetVoxelSizeWorld()
 			- RayStart.X) / Direction.X;
 	}
@@ -250,8 +264,8 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 		TMaxX = TMax;
 	}
 
-	size_t CurrentYIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld()));
-	const size_t EndYIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld()));
+	int64 CurrentYIndex = FMath::CeilToInt64((RayStart.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld());
+	int64 EndYIndex = FMath::CeilToInt64((RayEnd.Y - GridMinBound.Y) / VoxelWorld->GetVoxelSizeWorld());
 	int StepY;
 	double TDeltaY;
 	double TMaxY;
@@ -266,7 +280,7 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 	{
 		StepY = -1;
 		TDeltaY = VoxelWorld->GetVoxelSizeWorld() / -Direction.Y;
-		const size_t PreviousYIndex = CurrentYIndex - 1;
+		int64 PreviousYIndex = CurrentYIndex - 1;
 		TMaxY = TMin + (GridMinBound.Y + PreviousYIndex * VoxelWorld->GetVoxelSizeWorld()
 			- RayStart.Y) / Direction.Y;
 	}
@@ -277,8 +291,8 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 		TMaxY = TMax;
 	}
 
-	size_t CurrentZIndex = FMath::Max(1, FMath::CeilToInt64((RayStart.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld()));
-	const size_t EndZIndex = FMath::Max(1, FMath::CeilToInt64((RayEnd.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld()));
+	int64 CurrentZIndex = FMath::CeilToInt64((RayStart.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld());
+	int64 EndZIndex = FMath::CeilToInt64((RayEnd.Z - GridMinBound.Z) / VoxelWorld->GetVoxelSizeWorld());
 	int StepZ;
 	double TDeltaZ;
 	double TMaxZ;
@@ -293,7 +307,7 @@ void UVoxelQueryUtils::AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVe
 	{
 		StepZ = -1;
 		TDeltaZ = VoxelWorld->GetVoxelSizeWorld() / -Direction.Z;
-		const size_t PreviousZIndex = CurrentZIndex - 1;
+		int64 PreviousZIndex = CurrentZIndex - 1;
 		TMaxZ = TMin + (GridMinBound.Z + PreviousZIndex * VoxelWorld->GetVoxelSizeWorld()
 			- RayStart.Z) / Direction.Z;
 	}
