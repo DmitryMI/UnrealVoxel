@@ -19,6 +19,16 @@ bool UVoxelMovementComponent::ResolvePenetrationImpl(const FVector& Adjustment, 
 	return bPositionCorrected;
 }
 
+bool UVoxelMovementComponent::IsExceedingMaxSpeed(float MaxSpeedArg) const
+{
+	MaxSpeedArg = FMath::Max(0.f, MaxSpeedArg);
+	const float MaxSpeedSquared = FMath::Square(MaxSpeedArg);
+
+	// Allow 1% error tolerance, to account for numeric imprecision.
+	const float OverVelocityPercent = 1.01f;
+	return (Velocity.SizeSquared2D() > MaxSpeedSquared * OverVelocityPercent);
+}
+
 void UVoxelMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	if (ShouldSkipUpdate(DeltaTime))
@@ -39,9 +49,15 @@ void UVoxelMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		return;
 	}
 
+	FVector PendingInputVector = GetPendingInputVector();
+	ConsumeInputVector();
+	bool bWantsJumping = PendingInputVector.Z > 0;
+	PendingInputVector.Z = 0;
+	PendingInputVector = PendingInputVector.GetClampedToMaxSize(1.0);
+
 	if (Controller->IsLocalPlayerController() == true || Controller->IsFollowingAPath() == false || NavMovementProperties.bUseAccelerationForPaths)
 	{
-		ApplyControlInputToVelocity(DeltaTime);
+		ApplyControlInputToVelocity(DeltaTime, PendingInputVector);
 	}
 	else if (IsExceedingMaxSpeed(MaxSpeed) == true)
 	{
@@ -49,6 +65,11 @@ void UVoxelMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	}
 
 	Velocity += FVector::UpVector * GetGravityZ() * GravityMultiplier * DeltaTime;
+
+	if (bIsGrounded && bWantsJumping)
+	{
+		Velocity += FVector::UpVector * JumpVelocity;
+	}
 
 	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
 	FVector OldLocation = UpdatedComponent->GetComponentLocation();
@@ -90,48 +111,44 @@ bool UVoxelMovementComponent::LimitWorldBounds()
 	return false;
 }
 
-void UVoxelMovementComponent::ApplyControlInputToVelocity(float DeltaTime)
+void UVoxelMovementComponent::ApplyControlInputToVelocity(float DeltaTime, FVector& PendingInputVector)
 {
-	const FVector ControlAcceleration = GetPendingInputVector().GetClampedToMaxSize(1.f);
-
-	const float AnalogInputModifier = (ControlAcceleration.SizeSquared() > 0.f ? ControlAcceleration.Size() : 0.f);
+	const float AnalogInputModifier = (PendingInputVector.SizeSquared() > 0.f ? PendingInputVector.Size() : 0.f);
 	const float MaxPawnSpeed = GetMaxSpeed() * AnalogInputModifier;
 	const bool BExceedingMaxSpeed = IsExceedingMaxSpeed(MaxPawnSpeed);
+	const FVector OldVelocity = Velocity;
 
 	if (AnalogInputModifier > 0.f && !BExceedingMaxSpeed)
 	{
 		// Apply change in velocity direction
-		if (Velocity.SizeSquared() > 0.f)
+		if (Velocity.SizeSquared2D() > 0.f)
 		{
 			// Change direction faster than only using acceleration, but never increase velocity magnitude.
 			const float TimeScale = FMath::Clamp(DeltaTime * TurningBoost, 0.f, 1.f);
-			Velocity = Velocity + (ControlAcceleration * Velocity.Size() - Velocity) * TimeScale;
+			Velocity = Velocity + (PendingInputVector * Velocity.Size2D() - Velocity) * TimeScale;
 		}
 	}
 	else
 	{
 		// Dampen velocity magnitude based on deceleration.
-		if (Velocity.SizeSquared() > 0.f)
+		if (Velocity.SizeSquared2D() > 0.f)
 		{
-			const FVector OldVelocity = Velocity;
-			const float VelSize = FMath::Max(Velocity.Size() - FMath::Abs(Deceleration) * DeltaTime, 0.f);
+			
+			const float VelSize = FMath::Max(Velocity.Size2D() - FMath::Abs(Deceleration) * DeltaTime, 0.f);
 			Velocity = Velocity.GetSafeNormal() * VelSize;
 			// Don't allow braking to lower us below max speed if we started above it.
-			if (BExceedingMaxSpeed && Velocity.SizeSquared() < FMath::Square(MaxPawnSpeed))
+			if (BExceedingMaxSpeed && Velocity.SizeSquared2D() < FMath::Square(MaxPawnSpeed))
 			{
 				Velocity = OldVelocity.GetSafeNormal() * MaxPawnSpeed;
 			}
-
-			Velocity.Z = OldVelocity.Z;
 		}
 	}
 
 	// Apply acceleration and clamp velocity magnitude.
-	const float NewMaxSpeed = (IsExceedingMaxSpeed(MaxPawnSpeed)) ? Velocity.Size() : MaxPawnSpeed;
-	Velocity += ControlAcceleration * FMath::Abs(Acceleration) * DeltaTime;
-	Velocity = Velocity.GetClampedToMaxSize(NewMaxSpeed);
-
-	ConsumeInputVector();
+	const float NewMaxSpeed = (IsExceedingMaxSpeed(MaxPawnSpeed)) ? Velocity.Size2D() : MaxPawnSpeed;
+	Velocity += PendingInputVector * FMath::Abs(Acceleration) * DeltaTime;
+	Velocity = Velocity.GetClampedToMaxSize2D(NewMaxSpeed);
+	Velocity.Z = OldVelocity.Z;
 }
 
 bool UVoxelMovementComponent::ClampVector(FVector& Vec, const FVector& Min, const FVector& Max) const

@@ -42,6 +42,7 @@ public:
 	virtual float GetMaxSpeed() const override { return MaxSpeed; }
 protected:
 	virtual bool ResolvePenetrationImpl(const FVector& Adjustment, const FHitResult& Hit, const FQuat& NewRotation) override;
+	virtual bool IsExceedingMaxSpeed(float MaxSpeedArg) const override;
 private:
 	UPROPERTY()
 	AVoxelWorld* VoxelWorld;
@@ -50,10 +51,10 @@ private:
 	bool bPositionCorrected = true;
 
 	UPROPERTY(EditAnywhere)
-	float GravityMultiplier = 1;
+	double GravityMultiplier = 1;
 
 	UPROPERTY(EditAnywhere)
-	bool bCheckForUnrealEngineCollisions = false;
+	double JumpVelocity = 1000;
 
 	UPROPERTY(EditAnywhere)
 	bool bDebugDrawVoxelCollider = false;
@@ -62,7 +63,7 @@ private:
 	bool bIsGrounded = false;
 
 	bool LimitWorldBounds();
-	void ApplyControlInputToVelocity(float DeltaTime);
+	void ApplyControlInputToVelocity(float DeltaTime, FVector& PendingInputVector);
 	bool ClampVector(FVector& Vec, const FVector& Min, const FVector& Max) const;
 	void ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, FVector& InOutDelta, FIntVector& OutDirectionBlocked);
 	FBox GetVoxelCollider() const;
