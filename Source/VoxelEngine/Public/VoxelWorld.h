@@ -64,6 +64,9 @@ public:
 	FIntVector GetWorldSizeVoxel() const;
 
 	UFUNCTION(BlueprintCallable)
+	FBox GetBoundingBoxWorld() const;
+
+	UFUNCTION(BlueprintCallable)
 	void GetChunkWorldDimensions(int32& OutX, int32& OutY) const;
 
 	UFUNCTION(BlueprintCallable)
@@ -79,11 +82,16 @@ public:
 
 	bool IsVoxelTransparentTypeOverride(const FIntVector& Coord, VoxelType VoxelType) const;
 
+	bool IsVoxelTraversable(const FIntVector& Coord) const;
+
 	UFUNCTION(BlueprintCallable)
 	UMaterialInterface* GetVoxelChunkMaterial() const;
 
 	UFUNCTION(BlueprintCallable)
 	FVector GetVoxelCenterWorld(const FIntVector& Coord) const;
+
+	UFUNCTION(BlueprintCallable)
+	FBox GetVoxelBoundingBox(const FIntVector& Coord) const;
 
 	UFUNCTION(BlueprintCallable)
 	FIntVector GetVoxelCoordFromWorld(const FVector& Location) const;

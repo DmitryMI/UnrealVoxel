@@ -16,7 +16,7 @@ enum class EVoxelLineTraceFilterMode : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FVoxelLineTraceFilterParams
+struct FVoxelQueryFilterParams
 {
 	GENERATED_BODY()
 
@@ -25,6 +25,12 @@ struct FVoxelLineTraceFilterParams
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelLineTraceFilterMode Traversible = EVoxelLineTraceFilterMode::DontCare;
+};
+
+USTRUCT(BlueprintType)
+struct FVoxelLineTraceFilterParams : public FVoxelQueryFilterParams
+{
+	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	double MaxDistance = -1;
@@ -45,8 +51,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Voxel Query Utils")
 	static bool VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, const FVoxelLineTraceFilterParams& Params, FIntVector& OutHitCoord);
 
+	UFUNCTION(BlueprintCallable, Category = "Voxel Query Utils")
+	static bool VoxelBoxOverlapFilterMulti(AVoxelWorld* VoxelWorld, const FBox& BoxWorld, TArray<FIntVector>& OverlappedVoxels, const FVoxelQueryFilterParams& Params);
 private:
-	static bool CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld,const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params);
+	static bool CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params);
+
+	static bool CheckIfVoxelSatisfiesLineTraceFilter(AVoxelWorld* VoxelWorld,const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params);
 
 	static TArray<int> GetMinComponent(const FVector& Values, const TStaticArray<bool, 3>& ValidityFlags);
 

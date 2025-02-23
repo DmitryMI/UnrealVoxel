@@ -80,6 +80,13 @@ FIntVector AVoxelWorld::GetWorldSizeVoxel() const
 	return FIntVector(ChunkWorldDimensions.X * ChunkSide, ChunkWorldDimensions.Y * ChunkSide, WorldHeight);
 }
 
+FBox AVoxelWorld::GetBoundingBoxWorld() const
+{
+	FIntVector WorldSizeVoxel = GetWorldSizeVoxel();
+	FVector WorldSize = FVector(WorldSizeVoxel) * VoxelSizeWorld;
+	return FBox(GetActorLocation(), GetActorLocation() + WorldSize);
+}
+
 // Called when the game starts or when spawned
 void AVoxelWorld::BeginPlay()
 {
@@ -397,6 +404,24 @@ bool AVoxelWorld::IsVoxelTransparentTypeOverride(const FIntVector& Coord, VoxelT
 	return VoxelData->bIsTransparent;
 }
 
+bool AVoxelWorld::IsVoxelTraversable(const FIntVector& Coord) const
+{
+	if (!IsValidCoordinate(Coord))
+	{
+		return true;
+	}
+
+	const Voxel& Voxel = GetVoxel(Coord);
+	if (Voxel.VoxelTypeId == EmptyVoxelType)
+	{
+		return true;
+	}
+
+	UVoxelData* VoxelData = VoxelTypeSet->GetVoxelDataByType(Voxel.VoxelTypeId);
+	check(VoxelData);
+	return VoxelData->bIsTraversable;
+}
+
 UMaterialInterface* AVoxelWorld::GetVoxelChunkMaterial() const
 {
 	return DynamicMaterialInstance;
@@ -405,6 +430,13 @@ UMaterialInterface* AVoxelWorld::GetVoxelChunkMaterial() const
 FVector AVoxelWorld::GetVoxelCenterWorld(const FIntVector& Coord) const
 {
 	return GetActorLocation() + VoxelSizeWorld * FVector(Coord.X, Coord.Y, Coord.Z) + VoxelSizeWorld / 2;
+}
+
+FBox AVoxelWorld::GetVoxelBoundingBox(const FIntVector& Coord) const
+{
+	FVector Extent = FVector(VoxelSizeWorld / 2, VoxelSizeWorld / 2, VoxelSizeWorld / 2);
+	FVector Center = GetVoxelCenterWorld(Coord);
+	return FBox::BuildAABB(Center, Extent);
 }
 
 FIntVector AVoxelWorld::GetVoxelCoordFromWorld(const FVector& Location) const
