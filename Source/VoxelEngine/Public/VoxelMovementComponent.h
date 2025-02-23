@@ -64,8 +64,6 @@ private:
 	bool LimitWorldBounds();
 	void ApplyControlInputToVelocity(float DeltaTime);
 	bool ClampVector(FVector& Vec, const FVector& Min, const FVector& Max) const;
-	void ProcessMovement(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude);
-	FVector ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude);
-	bool CheckGround(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude);
+	void ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, FVector& InOutDelta, FIntVector& OutDirectionBlocked);
 	FBox GetVoxelCollider() const;
 }; 
