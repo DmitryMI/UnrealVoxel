@@ -157,10 +157,6 @@ bool UVoxelMovementComponent::ClampVector(FVector& Vec, const FVector& Min, cons
 
 void UVoxelMovementComponent::ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, FVector& InOutDelta, FIntVector& OutDirectionBlocked)
 {
-	if (InOutDelta.IsNearlyZero())
-	{
-		return;
-	}
 	FVector DeltaAbs = InOutDelta.GetAbs();
 	
 	double SweepStep = VoxelWorld->GetVoxelSizeWorld() / 3;
