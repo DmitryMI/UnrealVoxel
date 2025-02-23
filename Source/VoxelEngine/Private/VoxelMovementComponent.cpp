@@ -157,9 +157,14 @@ bool UVoxelMovementComponent::ClampVector(FVector& Vec, const FVector& Min, cons
 
 void UVoxelMovementComponent::ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, FVector& InOutDelta, FIntVector& OutDirectionBlocked)
 {
-	if (InOutDelta.IsNearlyZero())
+	
+}
+
+FVector UVoxelMovementComponent::ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude)
+{
+	if (FMath::IsNearlyZero(DeltaMagnitude))
 	{
-		return;
+		return FVector::Zero();
 	}
 	FVector DeltaAbs = InOutDelta.GetAbs();
 	
