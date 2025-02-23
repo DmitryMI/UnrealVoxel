@@ -39,9 +39,6 @@ void UVoxelMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		return;
 	}
 
-	FVector OldLocation = UpdatedComponent->GetComponentLocation();
-	FBox VoxelColliderBox = GetVoxelCollider();
-
 	if (Controller->IsLocalPlayerController() == true || Controller->IsFollowingAPath() == false || NavMovementProperties.bUseAccelerationForPaths)
 	{
 		ApplyControlInputToVelocity(DeltaTime);
@@ -51,14 +48,35 @@ void UVoxelMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		Velocity = Velocity.GetUnsafeNormal() * MaxSpeed;
 	}
 
-	bPositionCorrected = false;
-	bIsGrounded = CheckGround(DeltaTime, VoxelColliderBox);
+	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+	FVector OldLocation = UpdatedComponent->GetComponentLocation();
+	FBox VoxelColliderBox = GetVoxelCollider();
+	FVector Delta = Velocity * DeltaTime;
+	double DeltaMagnitude = 0;
+	FVector DeltaNormalized{0, 0, 0};
+	if (!Delta.IsNearlyZero())
+	{
+		DeltaMagnitude = Delta.Size();
+		DeltaNormalized = Delta / DeltaMagnitude;
+	}
+
 	if (!bIsGrounded)
 	{
 		Velocity += FVector::UpVector * GetGravityZ() * GravityMultiplier * DeltaTime;
 	}
+
+	if (!VoxelColliderBox.IsValid)
+	{
+		MoveUpdatedComponent(Delta, Rotation, false);
+		return;
+	}
+
+	bPositionCorrected = false;
+	bIsGrounded = CheckGround(DeltaTime, VoxelColliderBox, DeltaNormalized, DeltaMagnitude);
 	
-	ProcessMovement(DeltaTime);
+	Delta = ProcessVoxelCollision(DeltaTime, VoxelColliderBox, DeltaNormalized, DeltaMagnitude);
+
+	MoveUpdatedComponent(Delta, Rotation, false);
 
 	LimitWorldBounds();
 	
@@ -146,92 +164,99 @@ bool UVoxelMovementComponent::ClampVector(FVector& Vec, const FVector& Min, cons
 	return bWasChanged;
 }
 
-void UVoxelMovementComponent::ProcessMovement(float DeltaTime)
+void UVoxelMovementComponent::ProcessMovement(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude)
 {
-	UPrimitiveComponent* RootPrimitive = Cast<UPrimitiveComponent>(UpdatedComponent);
-
-	FVector Delta = Velocity * DeltaTime;
-
-	const FVector OldLocation = UpdatedComponent->GetComponentLocation();
-	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
-
-	if (!RootPrimitive)
-	{
-		MoveUpdatedComponent(Delta, Rotation, false);
-		return;
-	}
 	
-	float CyllinderRadius;
-	float CyllinderHalfHeight;
-	RootPrimitive->CalcBoundingCylinder(CyllinderRadius, CyllinderHalfHeight);
-	float CyllinderHeight = CyllinderHalfHeight * 2;
-	FVector Extent(CyllinderRadius, CyllinderRadius, CyllinderHalfHeight);
-	FBox VoxelColliderBox = FBox::BuildAABB(RootPrimitive->GetComponentLocation(), Extent);
-	Delta = ProcessVoxelCollision(DeltaTime, VoxelColliderBox);
-
-	MoveUpdatedComponent(Delta, Rotation, false);
-
-	// Update velocity
-	// We don't want position changes to vastly reverse our direction (which can happen due to penetration fixups etc)
-	if (bPositionCorrected)
-	{
-		const FVector NewLocation = UpdatedComponent->GetComponentLocation();
-		Velocity = ((NewLocation - OldLocation) / DeltaTime);
-	}
 }
 
-FVector UVoxelMovementComponent::ProcessVoxelCollision(float DeltaTime, const FBox& VoxelCollider)
+FVector UVoxelMovementComponent::ProcessVoxelCollision(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude)
 {
-	FVector Delta = Velocity * DeltaTime;
-	FVector MovementDirection = Delta.GetUnsafeNormal();
-	FVector CurrentLocation = UpdatedComponent->GetComponentLocation();
-	FVector ProjectedLocation = CurrentLocation + Delta;
-	FBox ProjectedCollider = VoxelCollider.MoveTo(ProjectedLocation);
-
-	FVoxelQueryFilterParams Filter;
-	Filter.Traversible = EVoxelLineTraceFilterMode::Negative;
-	TArray<FIntVector> OverlappedVoxels;
-	bool bHasCollisions = UVoxelQueryUtils::VoxelBoxOverlapFilterMulti(VoxelWorld, ProjectedCollider, OverlappedVoxels, Filter);
-	if (!bHasCollisions)
+	if (FMath::IsNearlyZero(DeltaMagnitude))
 	{
-		return Delta;
+		return FVector::Zero();
 	}
-
-	for (const FIntVector& OverlappedVoxel : OverlappedVoxels)
+	FVector Delta = DeltaNormalized * DeltaMagnitude;
+	FVector DeltaAbs = Delta.GetAbs();
+	
+	double SweepStep = VoxelWorld->GetVoxelSizeWorld() / 3;
+	
+	for (int Dim = 0; Dim < 3; Dim++)
 	{
-		FBox OverlappedVoxelBox = VoxelWorld->GetVoxelBoundingBox(OverlappedVoxel);
-		FBox Overlap = OverlappedVoxelBox.Overlap(ProjectedCollider);
-		if (Overlap.GetSize().IsNearlyZero(0.1))
+		int SweepStepsNum = FMath::CeilToInt(DeltaAbs[Dim] / SweepStep);
+
+		for (int SweepIndex = 0; SweepIndex < SweepStepsNum; SweepIndex++)
 		{
-			continue;
+			FVector SweepDelta{ 0, 0, 0 };
+			SweepDelta[Dim] = FMath::Sign(Delta[Dim]) * SweepStep * (SweepIndex + 1);
+			if (FMath::Abs(SweepDelta[Dim]) > DeltaAbs[Dim])
+			{
+				SweepDelta[Dim] = Delta[Dim];
+			}
+			FBox ColliderSweep = VoxelColliderBox.ShiftBy(SweepDelta);
+			FVector SweepCenter = ColliderSweep.GetCenter();
+			TArray<FIntVector> BlockingVoxels;
+			FVoxelQueryFilterParams Filter;
+			Filter.Traversible = EVoxelLineTraceFilterMode::Negative;
+			bool bHasHit = UVoxelQueryUtils::VoxelBoxOverlapFilterMulti(VoxelWorld, ColliderSweep, BlockingVoxels, Filter);
+
+			if (!bHasHit)
+			{
+				continue;
+			}
+
+			bool bVelocityClamped = false;
+
+			for (const FIntVector& Voxel : BlockingVoxels)
+			{
+				FBox VoxelBox = VoxelWorld->GetVoxelBoundingBox(Voxel);
+				FBox Overlap = VoxelBox.Overlap(ColliderSweep);
+				if (!Overlap.IsValid || FMath::IsNearlyZero(Overlap.GetVolume()))
+				{
+					continue;
+				}
+				FVector VoxelCenter = VoxelBox.GetCenter();
+				FVector DirectionToVoxel = VoxelCenter - SweepCenter;
+				if (FMath::Sign(DirectionToVoxel[Dim]) != FMath::Sign(Delta[Dim]))
+				{
+					continue;
+				}
+				FVector DistanceBetweenBoxes = (VoxelColliderBox.GetCenter() - VoxelBox.GetCenter()).GetAbs() - (VoxelColliderBox.GetExtent() + VoxelBox.GetExtent());
+				double DistanceToSurface = DistanceBetweenBoxes[Dim];
+				if (DistanceToSurface < 0)
+				{
+					continue;
+				}
+				if (FMath::IsNearlyZero(DistanceToSurface, 0.01) || DistanceToSurface < DeltaAbs[Dim])
+				{
+					int SpeedSign = FMath::Sign(Velocity[Dim]);
+					double Speed = DistanceToSurface / DeltaTime;
+					if (FMath::Abs(Velocity[Dim]) > Speed)
+					{
+						Velocity[Dim] = SpeedSign * Speed;
+						Delta[Dim] = SpeedSign * Speed;
+						DeltaAbs[Dim] = Speed;
+					}
+					bVelocityClamped = true;
+				}
+			}
+
+			if (bVelocityClamped)
+			{
+				break;
+			}
 		}
-
-		DrawDebugBox(GetWorld(), Overlap.GetCenter(), Overlap.GetExtent(), FColor::Red, false, -1, 10, 0);
-
-		FVector AxisDistances = (OverlappedVoxelBox.GetCenter() - ProjectedCollider.GetCenter()).GetAbs() - (OverlappedVoxelBox.GetExtent() + ProjectedCollider.GetExtent());
-
-		FVector PenetrationPull = MovementDirection * FVector::DotProduct(MovementDirection, AxisDistances);
-		DrawDebugLine(GetWorld(), ProjectedLocation, ProjectedLocation - PenetrationPull, FColor::Blue);
-
-		ProjectedLocation -= PenetrationPull;
-		ProjectedCollider = ProjectedCollider.MoveTo(ProjectedLocation);
-		bPositionCorrected = true;
 	}
 
-	Delta = ProjectedLocation - CurrentLocation;
-	return Delta;
+	return Velocity * DeltaTime;
 }
 
-bool UVoxelMovementComponent::CheckGround(float DeltaTime, const FBox& VoxelColliderBox)
+bool UVoxelMovementComponent::CheckGround(float DeltaTime, const FBox& VoxelColliderBox, const FVector& DeltaNormalized, double DeltaMagnitude)
 {
 	if (Velocity.Z > 0)
 	{
 		return false;
 	}
 
-	FVector Delta = Velocity * DeltaTime;
-	double DeltaMagnitude = Delta.Size();
-	FVector MovementDirection = Delta / DeltaMagnitude;
 	FVector FeetLocation = VoxelColliderBox.GetCenter();
 	FeetLocation.Z -= VoxelColliderBox.GetExtent().Z;
 
@@ -246,7 +271,7 @@ bool UVoxelMovementComponent::CheckGround(float DeltaTime, const FBox& VoxelColl
 		{
 			SweepDeltaMagnitude = DeltaMagnitude;
 		}
-		FVector SweepDelta = MovementDirection * SweepDeltaMagnitude;
+		FVector SweepDelta = DeltaNormalized * SweepDeltaMagnitude;
 		
 		FVector FeetLocationSweep = FeetLocation + SweepDelta;
 		FVector GroundQueryBoxMin = FVector(VoxelColliderBox.Min.X, VoxelColliderBox.Min.Y, FeetLocationSweep.Z - SweepStep);
