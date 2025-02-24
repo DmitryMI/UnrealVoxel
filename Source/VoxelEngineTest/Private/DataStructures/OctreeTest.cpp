@@ -3,7 +3,7 @@
 
 namespace VoxelEngine::DataStructures
 {
-    IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOctreeConstructionTest, "VoxelEngine.Tests.DataStructures.Octree.Ctor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
+    IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOctreeConstructionTest, "VoxelEngine.Tests.DataStructures.Octree.Ctor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)  
     bool FOctreeConstructionTest::RunTest(const FString& Parameters)
     {
         FBox GlobalBoundary = FBox(FVector(0, 0, 0), FVector(1000, 1000, 1000));
