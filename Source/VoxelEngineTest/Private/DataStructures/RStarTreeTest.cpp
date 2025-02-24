@@ -8,38 +8,35 @@ namespace VoxelEngine::DataStructures
     {
         FBox GlobalBoundary = FBox(FVector(0, 0, 0), FVector(1000, 1000, 1000));
         // FBox Box1(FVector(1, 1, 1), FVector(2, 2, 2));
-        // VoxelEngine::DataStructures::TOctree<FBox> Octree(GlobalBoundary, [](const FBox& Item) {return Item; });
+        VoxelEngine::DataStructures::TRStarTree<FBox> RStarTree;
         return true;
     }
 
     IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRStarTreeSearchPointSingleItemTest, "VoxelEngine.Tests.DataStructures.RStarTree.SearchPoint.SingleItem", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
     bool FRStarTreeSearchPointSingleItemTest::RunTest(const FString& Parameters)
     {
-        /*
         FBox GlobalBoundary = FBox(FVector(0, 0, 0), FVector(1000, 1000, 1000));
         FBox Box1(FVector(1, 1, 1), FVector(2, 2, 2));
-        VoxelEngine::DataStructures::TOctree<FBox> Octree(GlobalBoundary, [](const FBox& Item) {return Item; });
+        VoxelEngine::DataStructures::TRStarTree<FBox> RStarTree;
 
-        Octree.Insert(Box1);
-        auto SearchResult = Octree.Search(FVector(0, 0, 0));
-        TestEqual("Search on miss 1", SearchResult.size(), 0);
+        RStarTree.Insert(Box1, Box1);
+        auto SearchResult = RStarTree.Query(FVector(0, 0, 0));
+        TestEqual("Search on miss 1", SearchResult.Num(), 0);
 
-        SearchResult = Octree.Search(FVector(3, 3, 3));
-        TestEqual("Search on miss 2", SearchResult.size(), 0);
+        SearchResult = RStarTree.Query(FVector(3, 3, 3));
+        TestEqual("Search on miss 2", SearchResult.Num(), 0);
 
-        SearchResult = Octree.Search(FVector(1.1, 1.1, 1.1));
-        TestEqual("Search on hit", SearchResult.size(), 1);
+        SearchResult = RStarTree.Query(FVector(1.1, 1.1, 1.1));
+        TestEqual("Search on hit", SearchResult.Num(), 1);
+        TestEqual("Search result Key", SearchResult[0].Key, Box1);
+        TestEqual("Search result Value", SearchResult[0].Value, Box1);
 
-        
-        */
         return true;
     }
 
     IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRStarTreeSearchPointMultiItemTest, "VoxelEngine.Tests.DataStructures.RStarTree.SearchPoint.MultiItem", EAutomationTestFlags::EditorContext | EAutomationTestFlags::SmokeFilter)
     bool FRStarTreeSearchPointMultiItemTest::RunTest(const FString& Parameters)
     {
-        /*
-        FBox GlobalBoundary = FBox(FVector(0, 0, 0), FVector(12, 12, 12));
         TArray<FBox> Items
         {
             FBox(FVector(1, 1, 1), FVector(2, 2, 2)),
@@ -51,11 +48,11 @@ namespace VoxelEngine::DataStructures
             FBox(FVector(0, 0, 0), FVector(9.5, 0, 0)),
         };        
 
-        VoxelEngine::DataStructures::TOctree<FBox> Octree(GlobalBoundary, [](const FBox& Item) {return Item; }, 2);
+        VoxelEngine::DataStructures::TRStarTree<FBox> RStarTree;
 
         for (const auto& Item : Items)
         {
-            Octree.Insert(Item);
+            RStarTree.Insert(Item, Item);
         }
 
         TArray<FVector> SearchPoints
@@ -72,20 +69,21 @@ namespace VoxelEngine::DataStructures
             TArray<FBox> ExpectedResult;
             for (const auto& Item : Items)
             {
-                if (Item.IsInside(SearchPoint))
+                if (Item.IsInsideOrOn(SearchPoint))
                 {
                     ExpectedResult.Add(Item);
                 }
             }
-            auto SearchResult = Octree.Search(SearchPoint);
+            auto SearchResult = RStarTree.Query(SearchPoint);
             
-            TestEqual("Result size", SearchResult.size(), ExpectedResult.Num());
-            for (const FBox& FoundBox : SearchResult)
+            TestEqual("Result size", SearchResult.Num(), ExpectedResult.Num());
+            for (const TPair<FBox, FBox>& FoundBoxPair : SearchResult)
             {
                 bool bIsInExpectedSet = false;
                 for (const FBox& ExpectedBox : ExpectedResult)
                 {
-                    if (FoundBox == ExpectedBox)
+                    TestEqual("Key must equal Value", FoundBoxPair.Key, FoundBoxPair.Value);
+                    if (FoundBoxPair.Key == ExpectedBox)
                     {
                         bIsInExpectedSet = true;
                         break;
@@ -94,7 +92,7 @@ namespace VoxelEngine::DataStructures
                 TestTrue("Box in expected-set", bIsInExpectedSet);
             }
         }
-        */
+        
         return true;
     }
 
