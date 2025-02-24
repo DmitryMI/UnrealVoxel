@@ -13,6 +13,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "VoxelRenderingSettings.h"
 #include "VoxelChange.h"
+#include "VoxelNavManagerComponent.h"
 #include "VoxelWorld.generated.h"
 
 class AVoxelWorld;
@@ -165,10 +166,16 @@ private:
 	UPROPERTY()
 	UVoxelWorldGenerator* VoxelWorldGeneratorInstance = nullptr;
 
+	UPROPERTY()
+	UVoxelNavManagerComponent* VoxelNavManagerComponent = nullptr;
+
 	std::vector<Voxel> Voxels;
 
 	UFUNCTION()
 	void WorldGenerationFinishedCallback();
+
+	UFUNCTION()
+	void NavGenerationFinishedCallback();
 
 	bool InitializeMaterials();
 

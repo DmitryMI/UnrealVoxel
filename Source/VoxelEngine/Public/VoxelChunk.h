@@ -71,7 +71,7 @@ public:
 
 	void MarkMeshDirty();
 
-	EVoxelChangeResult ChangeVoxelRendering(const FVoxelChange& VoxelChange);
+	void ChangeVoxelRendering(const FVoxelChange& VoxelChange);
 
 
 protected:

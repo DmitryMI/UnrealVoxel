@@ -25,6 +25,9 @@ public class VoxelEngine : ModuleRules
         PublicIncludePaths.Add("VoxelEngine/Public/Query");
         PrivateIncludePaths.Add("VoxelEngine/Private/Query");
         PublicIncludePaths.Add("VoxelEngine/Public/DataStructures");
+        PrivateIncludePaths.Add("VoxelEngine/Private/DataStructures");
+        PublicIncludePaths.Add("VoxelEngine/Public/Navigation");
+        PrivateIncludePaths.Add("VoxelEngine/Private/Navigation");
 
         // Uncomment if you are using Slate UI
         // PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

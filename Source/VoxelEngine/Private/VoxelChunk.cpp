@@ -610,10 +610,9 @@ void UVoxelChunk::MarkMeshDirty()
 	bIsMeshDirty = true;
 }
 
-EVoxelChangeResult UVoxelChunk::ChangeVoxelRendering(const FVoxelChange& VoxelChange)
+void UVoxelChunk::ChangeVoxelRendering(const FVoxelChange& VoxelChange)
 {
 	VoxelChangeRequests.Enqueue(VoxelChange);
-	return EVoxelChangeResult::Executed;
 }
 
 void UVoxelChunk::RegenerateMesh()

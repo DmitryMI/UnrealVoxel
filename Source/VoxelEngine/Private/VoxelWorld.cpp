@@ -44,6 +44,8 @@ AVoxelWorld::AVoxelWorld()
 	SecondaryActorTick.TickGroup = TG_LastDemotable;
 	SecondaryActorTick.bCanEverTick = true;
 	SecondaryActorTick.bStartWithTickEnabled = true;
+
+	VoxelNavManagerComponent = CreateDefaultSubobject<UVoxelNavManagerComponent>(FName("NavManager"));
 }
 
 void AVoxelWorld::DrawChunkWireframes(bool bEnabled)
@@ -176,6 +178,15 @@ void AVoxelWorld::WorldGenerationFinishedCallback()
 	FDateTime ChunkSpawnEndTime = FDateTime::Now();
 	FTimespan ChunkSpawnElapsedTime = ChunkSpawnEndTime - ChunkSpawnStartTime;
 	UE_LOG(LogVoxelEngine, Display, TEXT("Spawned %d Chunk components, %3.2f milliseconds"), ChunkWorldDimensions.X * ChunkWorldDimensions.Y, ChunkSpawnElapsedTime.GetTotalMilliseconds());
+
+	UVoxelNavManagerComponent::FVoxelNavGenerationFinished Callback;
+	Callback.BindUFunction(this, FName("NavGenerationFinishedCallback"));
+	VoxelNavManagerComponent->GenerateNavData(Callback);
+}
+
+void AVoxelWorld::NavGenerationFinishedCallback()
+{
+	UE_LOG(LogVoxelEngine, Display, TEXT("Navigation data generated"));
 }
 
 bool AVoxelWorld::InitializeMaterials()
@@ -338,7 +349,9 @@ EVoxelChangeResult AVoxelWorld::ChangeVoxel(FVoxelChange& VoxelChange)
 	uint64 VoxelChunkIndex = LinearizeChunkCoordinate(GetChunkCoordFromVoxelCoord(VoxelChange.Coordinate));
 	check(0 <= VoxelChunkIndex && VoxelChunkIndex < Chunks.Num());
 	UVoxelChunk* Chunk = Chunks[VoxelChunkIndex];
-	return Chunk->ChangeVoxelRendering(VoxelChange);
+	Chunk->ChangeVoxelRendering(VoxelChange);
+	VoxelNavManagerComponent->ChangeVoxel(VoxelChange);
+	return EVoxelChangeResult::Executed;
 }
 
 EVoxelChangeResult AVoxelWorld::ChangeVoxel(const FIntVector& Coord, int32 DesiredVoxelType)
