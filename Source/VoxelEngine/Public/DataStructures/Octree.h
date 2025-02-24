@@ -4,6 +4,7 @@
 #include <memory>
 #include "CoreMinimal.h"
 #include <functional>
+#include <array>
 
 namespace VoxelEngine::DataStructures
 {
@@ -29,9 +30,9 @@ namespace VoxelEngine::DataStructures
 		using ItemBoundaryFunc = std::function<FBox(const T&)>;
 
 		TOctree(const FBox& Boundary, ItemBoundaryFunc ItemBoundaryGetter, size_t NodeCapacity = 32, size_t MaxDepth = 128):
-			ItemBoundaryGetter(ItemBoundaryGetter),
 			NodeCapacity(NodeCapacity),
-			MaxDepth(MaxDepth)
+			MaxDepth(MaxDepth),
+			ItemBoundaryGetter(ItemBoundaryGetter)
 		{
 			RootNode = std::make_unique<TOctreeNode<T>>(Boundary);
 		}
@@ -41,10 +42,10 @@ namespace VoxelEngine::DataStructures
 			Insert(RootNode.get(), Item, 0);
 		}
 
-		std::vector<std::shared_ptr<Box>> Search(const FVector& Location)
+		std::vector<T> Search(const FVector& Location)
 		{
 			std::vector<T> Results;
-			Search(RootNode.get(), Location, results);
+			Search(RootNode.get(), Location, Results);
 			return Results;
 		}
 

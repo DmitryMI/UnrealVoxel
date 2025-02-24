@@ -16,6 +16,7 @@ public class UnrealVoxelTarget : TargetRules
         if (Type == TargetType.Editor)
         {
             ExtraModuleNames.Add("VoxelEngineEditor");
+            ExtraModuleNames.Add("VoxelEngineTest");
         }
     }
 }

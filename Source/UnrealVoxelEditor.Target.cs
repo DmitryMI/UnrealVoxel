@@ -13,5 +13,6 @@ public class UnrealVoxelEditorTarget : TargetRules
 		ExtraModuleNames.Add("UnrealVoxel");
         ExtraModuleNames.Add("VoxelEngine");
         ExtraModuleNames.Add("VoxelEngineEditor");
+        ExtraModuleNames.Add("VoxelEngineTest");
     }
 }
