@@ -7,8 +7,9 @@ public class VoxelEngineTest : ModuleRules
 	public VoxelEngineTest(ReadOnlyTargetRules Target) : base(Target)
 	{	
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        CppStandard = CppStandardVersion.Cpp20;
 
-        PrivateDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "UnrealEd", "AutomationController" });
+        PrivateDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "UnrealEd", "AutomationController", "Boost" });
         PrivateDependencyModuleNames.Add("FunctionalTesting");
 		
         PrivateDependencyModuleNames.AddRange(new string[] { "VoxelEngine" });

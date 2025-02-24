@@ -7,8 +7,17 @@ public class VoxelEngine : ModuleRules
 	public VoxelEngine(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "GeometryCore", "GeometryFramework" });
+        CppStandard = CppStandardVersion.Cpp20;
+
+        PublicDependencyModuleNames.AddRange(new string[] { 
+                "Core", 
+                "CoreUObject", 
+                "Engine", 
+                "GeometryCore",
+                "GeometryFramework",
+                "Boost"
+            }
+        );
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

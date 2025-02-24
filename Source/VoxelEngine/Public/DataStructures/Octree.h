@@ -39,7 +39,7 @@ namespace VoxelEngine::DataStructures
 
 		void Insert(const T& Item)
 		{
-			Insert(RootNode.get(), Item, 0);
+			check(Insert(RootNode.get(), Item, 0));
 		}
 
 		std::vector<T> Search(const FVector& Location)
@@ -119,12 +119,12 @@ namespace VoxelEngine::DataStructures
 			);
 		}
 		
-		void Insert(TOctreeNode<T>* Node, const T& Item, int Depth)
+		bool Insert(TOctreeNode<T>* Node, const T& Item, int Depth)
 		{
 			if (Depth >= MaxDepth || Node->Items.size() < NodeCapacity)
 			{
 				Node->Items.push_back(Item);
-				return;
+				return true;
 			}
 
 			if (!Node->ChildOctants[0])
@@ -138,9 +138,13 @@ namespace VoxelEngine::DataStructures
 			{
 				if (Child->Boundary.Intersect(ItemBoundary))
 				{
-					Insert(Child.get(), ItemBoundary, Depth + 1);
+					if (Insert(Child.get(), ItemBoundary, Depth + 1))
+					{
+						return true;
+					}
 				}
 			}
+			return false;
 		}
 
 		void Search(TOctreeNode<T>* Node, const FVector& Location, std::vector<T>& Results) 

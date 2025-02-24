@@ -7,6 +7,7 @@ public class VoxelEngineEditor : ModuleRules
 	public VoxelEngineEditor(ReadOnlyTargetRules Target) : base(Target)
 	{	
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        CppStandard = CppStandardVersion.Cpp20;
 
         PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "AssetRegistry", "AssetTools", "ContentBrowser", "SlateCore", "Slate", "UnrealEd" });
         PrivateDependencyModuleNames.AddRange(new string[] { "VoxelEngine" });
