@@ -1,10 +1,10 @@
 // Based on https://github.com/cgyurgyik/fast-voxel-traversal-algorithm/blob/master/amanatidesWooAlgorithm.cpp
 
-#define VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES (WITH_EDITOR && 0)
+#define VOXEL_OVERLAP_FILTER_DRAW_DEBUG_SHAPES (WITH_EDITOR && 0)
 
 #include "VoxelQueryUtils.h"
 #include "VoxelEngine/VoxelEngine.h"
-#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
+#if VOXEL_OVERLAP_FILTER_DRAW_DEBUG_SHAPES
 #include "DrawDebugHelpers.h"
 #endif
 
@@ -33,7 +33,7 @@ bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const
 	
 	ensureMsgf(Params.MaxDistance > 0, TEXT("MaxDistance must be greater then zero"));
 
-#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
+#if VOXEL_OVERLAP_FILTER_DRAW_DEBUG_SHAPES
 	FVector LineEnd = Start + Params.MaxDistance * DirectionNormalized;
 	DrawDebugLine(VoxelWorld->GetWorld(), Start, LineEnd, FColor::Red);
 #endif
@@ -44,7 +44,7 @@ bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const
 
 	auto VoxelCallback = [VoxelWorld, Params, &OutHitCoord, &bHasValue](const FIntVector& Voxel)
 		{
-			if (CheckIfVoxelSatisfiesFilter(VoxelWorld, Voxel, Params))
+			if (CheckIfVoxelSatisfiesLineTraceFilter(VoxelWorld, Voxel, Params))
 			{
 				OutHitCoord = Voxel;
 				bHasValue = true;
@@ -60,7 +60,44 @@ bool UVoxelQueryUtils::VoxelLineTraceFilterSingle(AVoxelWorld* VoxelWorld, const
 	return bHasValue;
 }
 
-bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params)
+bool UVoxelQueryUtils::VoxelBoxOverlapFilterMulti(AVoxelWorld* VoxelWorld, const FBox& BoxWorld, TArray<FIntVector>& OverlappedVoxels, const FVoxelQueryFilterParams& Params)
+{
+	bool bWorldValid = IsValid(VoxelWorld);
+	ensureMsgf(bWorldValid, TEXT("VoxelWorld is nullptr"));
+	if (!bWorldValid)
+	{
+		return false;
+	}
+
+	FBox WorldBoundingBox = VoxelWorld->GetBoundingBoxWorld();
+	if (!BoxWorld.Intersect(WorldBoundingBox))
+	{
+		return false;
+	}
+
+	FIntVector MinVoxel = FIntVector(BoxWorld.Min / VoxelWorld->GetVoxelSizeWorld());
+	FIntVector MaxVoxel = FIntVector(BoxWorld.Max / VoxelWorld->GetVoxelSizeWorld());
+
+	for (int X = MinVoxel.X; X <= MaxVoxel.X; X++)
+	{
+		for (int Y = MinVoxel.Y; Y <= MaxVoxel.Y; Y++)
+		{
+			for (int Z = MinVoxel.Z; Z <= MaxVoxel.Z; Z++)
+			{
+				FIntVector Coord{ X, Y, Z };
+				if (!CheckIfVoxelSatisfiesQueryFilter(VoxelWorld, Coord, Params))
+				{
+					continue;
+				}
+				OverlappedVoxels.Add(Coord);
+			}
+		}
+	}
+
+	return OverlappedVoxels.Num() > 0;
+}
+
+bool UVoxelQueryUtils::CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params)
 {
 	if (!VoxelWorld->IsValidCoordinate(Coord))
 	{
@@ -71,7 +108,7 @@ bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, cons
 
 	if (Voxel.VoxelTypeId == EmptyVoxelType)
 	{
-#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
+#if VOXEL_OVERLAP_FILTER_DRAW_DEBUG_SHAPES
 		FVector Location = VoxelWorld->GetVoxelCenterWorld(Coord);
 		FVector Extent = FVector(VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld()) / 2;
 		DrawDebugBox(VoxelWorld->GetWorld(), Location, Extent, FColor::Cyan);
@@ -112,12 +149,19 @@ bool UVoxelQueryUtils::CheckIfVoxelSatisfiesFilter(AVoxelWorld* VoxelWorld, cons
 		Color = FColor::Red;
 	}
 
-#if VOXEL_LINE_TRACE_FILTER_SINGLE_DRAW_DEBUG_SHAPES
+#if VOXEL_OVERLAP_FILTER_DRAW_DEBUG_SHAPES
 	FVector Location = VoxelWorld->GetVoxelCenterWorld(Coord);
 	FVector Extent = FVector(VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld(), VoxelWorld->GetVoxelSizeWorld()) / 2;
 	DrawDebugBox(VoxelWorld->GetWorld(), Location, Extent, Color);
 #endif
 	return bPass;
+
+	return false;
+}
+
+bool UVoxelQueryUtils::CheckIfVoxelSatisfiesLineTraceFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params)
+{
+	return CheckIfVoxelSatisfiesQueryFilter(VoxelWorld, Coord, Params);
 }
 
 TArray<int> UVoxelQueryUtils::GetMinComponent(const FVector& Values, const TStaticArray<bool, 3>& ValidityFlags)

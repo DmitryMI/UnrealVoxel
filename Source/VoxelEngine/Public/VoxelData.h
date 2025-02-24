@@ -21,6 +21,9 @@ public:
 	UPROPERTY(EditDefaultsOnly)
 	bool bIsTraversable;
 
+	UPROPERTY(EditDefaultsOnly)
+	FBox Collider = FBox(FVector(0, 0, 0), FVector(1, 1, 1));
+
 	UPROPERTY(EditAnywhere)
 	bool bDoNotRegenerateGraphicsData = false;
 
