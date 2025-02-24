@@ -3,7 +3,6 @@
 
 #include "VoxelWorld.h"
 #include "Misc/DateTime.h"
-#include "SimplexNoise.h"
 #include "VoxelTextureAtlasGenerator.h"
 #include "VoxelEngine/VoxelEngine.h"
 

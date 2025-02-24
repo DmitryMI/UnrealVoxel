@@ -2,7 +2,7 @@
 
 
 #include "SimplexNoiseVoxelWorldGenerator.h"
-#include "SimplexNoise.h"
+#include "VoxelEngine/Public/Noise/SimplexNoise.h"
 #include "VoxelWorld.h"
 
 FIntVector2 USimplexNoiseVoxelWorldGenerator::GetWantedWorldSizeVoxels() const
@@ -29,7 +29,7 @@ void USimplexNoiseVoxelWorldGenerator::GenerateWorld(AVoxelWorld* VoxelWorld, co
         for (int Y = 0; Y < WorldSizeActual.Y; Y++)
         {
             FVector WorldPos2D = VoxelWorld->GetVoxelCenterWorld(FIntVector(X, Y, 0));
-            float NoiseValue = USimplexNoise::Noise(WorldPos2D.X * NoiseScale, WorldPos2D.Y * NoiseScale);
+            float NoiseValue = VoxelEngine::Noise::SimplexNoise::Noise(WorldPos2D.X * NoiseScale, WorldPos2D.Y * NoiseScale);
 
             int32 Height = TerrainAverageHeight + NoiseValue * HeightAmplitude;
             int32 DirtLowest = Height - GrassThickness - DirthThickness;

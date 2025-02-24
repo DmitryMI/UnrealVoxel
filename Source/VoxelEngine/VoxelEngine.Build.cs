@@ -12,6 +12,10 @@ public class VoxelEngine : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
+        PublicIncludePaths.Add("VoxelEngine/Public/Noise");
+        PublicIncludePaths.Add("VoxelEngine/Public/Query");
+        PrivateIncludePaths.Add("VoxelEngine/Private/Query");
+
         // Uncomment if you are using Slate UI
         // PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 

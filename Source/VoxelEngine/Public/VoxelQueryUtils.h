@@ -59,9 +59,4 @@ private:
 	static bool CheckIfVoxelSatisfiesLineTraceFilter(AVoxelWorld* VoxelWorld,const FIntVector& Coord, const FVoxelLineTraceFilterParams& Params);
 
 	static TArray<int> GetMinComponent(const FVector& Values, const TStaticArray<bool, 3>& ValidityFlags);
-
-	static bool RayBoxIntersection(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double MaxDistance, double& tMin, double& tMax,
-		double t0, double t1) noexcept;
-
-	static void AmanatidesWooAlgorithm(AVoxelWorld* VoxelWorld, const FVector& Start, const FVector& Direction, double MaxDistance, const FAmanatidesWooAlgorithmVoxelCallback& Callback) noexcept;
 };
