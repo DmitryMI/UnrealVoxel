@@ -1,8 +1,8 @@
 
 ## Voxel Engine TODO List
 - [x] Dynamic rendering
-- [ ] Terrain Collision System
-- [ ] Basic Movement Component
+- [x] Terrain Collision System
+- [x] Basic Movement Component
 - [ ] Navigation System
 - [ ] Interactive Doodad System with efficient proximity-search algorithm
 - [ ] Convert Voxel Engine to a Plugin
