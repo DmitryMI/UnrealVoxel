@@ -4,6 +4,7 @@
 #include <memory>
 #include "CoreMinimal.h"
 #include <functional>
+#include <array>
 
 namespace VoxelEngine::DataStructures
 {
@@ -29,9 +30,9 @@ namespace VoxelEngine::DataStructures
 		using ItemBoundaryFunc = std::function<FBox(const T&)>;
 
 		TOctree(const FBox& Boundary, ItemBoundaryFunc ItemBoundaryGetter, size_t NodeCapacity = 32, size_t MaxDepth = 128):
-			ItemBoundaryGetter(ItemBoundaryGetter),
 			NodeCapacity(NodeCapacity),
-			MaxDepth(MaxDepth)
+			MaxDepth(MaxDepth),
+			ItemBoundaryGetter(ItemBoundaryGetter)
 		{
 			RootNode = std::make_unique<TOctreeNode<T>>(Boundary);
 		}
@@ -41,10 +42,10 @@ namespace VoxelEngine::DataStructures
 			Insert(RootNode.get(), Item, 0);
 		}
 
-		std::vector<std::shared_ptr<Box>> Search(const FVector& Location)
+		std::vector<T> Search(const FVector& Location)
 		{
 			std::vector<T> Results;
-			Search(RootNode.get(), Location, results);
+			Search(RootNode.get(), Location, Results);
 			return Results;
 		}
 
@@ -135,7 +136,7 @@ namespace VoxelEngine::DataStructures
 
 			for (std::unique_ptr<TOctreeNode<T>>& Child : Node->ChildOctants)
 			{
-				if (Child->Boundary.Intersects(ItemBoundary))
+				if (Child->Boundary.Intersect(ItemBoundary))
 				{
 					Insert(Child.get(), ItemBoundary, Depth + 1);
 				}
@@ -144,7 +145,7 @@ namespace VoxelEngine::DataStructures
 
 		void Search(TOctreeNode<T>* Node, const FVector& Location, std::vector<T>& Results) 
 		{
-			if (!RootNode->Boundary.Contains(Location))
+			if (!RootNode->Boundary.IsInside(Location))
 			{
 				return;
 			}
@@ -152,7 +153,7 @@ namespace VoxelEngine::DataStructures
 			for (auto& Item : Node->Items)
 			{
 				FBox ItemBoundary = ItemBoundaryGetter(Item);
-				if (ItemBoundary.Contains(Location))
+				if (ItemBoundary.IsInside(Location))
 				{
 					Results.push_back(Item);
 				}
