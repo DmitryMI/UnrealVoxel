@@ -59,6 +59,8 @@ private:
 	bool IsVoxelWalkable(const FIntVector& Coord, int32 AgentHeight) const;
 	void CreateLevelZeroSiblingLinks(VoxelEngine::Navigation::NavNode* WalkableNode, const NavLevelGrid& LevelZeroNodes);
 
+	void CreateNavLevelNodes(NavLevelGrid& LevelGrid, const NavLevelGrid& PreviousLevel, int32 X, int32 Y, int32 Level) const;
+	void LinkNavLevelNodes(NavLevelGrid& LevelGrid, int32 X, int32 Y) const;
 	NavLevelGrid CreateNavLevel(const NavLevelGrid& PreviousLevel, int32 Level);
 
 	void DeepFirstSearch(

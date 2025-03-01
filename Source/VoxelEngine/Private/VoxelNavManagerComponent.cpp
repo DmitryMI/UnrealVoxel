@@ -101,6 +101,94 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 	}
 }
 
+void UVoxelNavManagerComponent::CreateNavLevelNodes(NavLevelGrid& LevelGrid, const NavLevelGrid& PreviousLevel, int32 X, int32 Y, int32 Level) const
+{
+	int PrevLevelMinX = X * 2;
+	int PrevLevelMaxX = (X + 1) * 2;
+	int PrevLevelMinY = Y * 2;
+	int PrevLevelMaxY = (Y + 1) * 2;
+
+	TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>> CellNodes;
+	for (int PrevX = PrevLevelMinX; PrevX < PrevLevelMaxX && PrevX < PreviousLevel.Num(); PrevX++)
+	{
+		for (int PrevY = PrevLevelMinY; PrevY < PrevLevelMaxY && PrevY < PreviousLevel[PrevX].Num(); PrevY++)
+		{
+			for (const auto& PrevLevelNode : PreviousLevel[PrevX][PrevY])
+			{
+				CellNodes.Add(PrevLevelNode);
+			}
+		}
+	}
+
+	auto GraphComponents = GetGraphComponents(CellNodes);
+	for (const auto& Component : GraphComponents)
+	{
+		FIntBox BoundingBox = GetBoundingBox(Component);
+		TSharedPtr<VoxelEngine::Navigation::NavNode> Parent = TSharedPtr<VoxelEngine::Navigation::NavNode>(new VoxelEngine::Navigation::NavNode(BoundingBox, Level));
+		for (const auto& Node : Component)
+		{
+			Parent->Children.Add(Node);
+			Node->Parent = Parent;
+		}
+		LevelGrid[X][Y].Add(Parent);
+	}
+}
+
+void UVoxelNavManagerComponent::LinkNavLevelNodes(NavLevelGrid& LevelGrid, int32 X, int32 Y) const
+{
+	const TStaticArray<FIntVector, 4> SiblingsOffsetsXy{
+		FIntVector(1, 0, 0),
+		FIntVector(0, 1, 0),
+		FIntVector(-1, 0, 0),
+		FIntVector(0, -1, 0),
+	};
+
+	for (const auto& Node : LevelGrid[X][Y])
+	{
+		for (const FIntVector& Offset : SiblingsOffsetsXy)
+		{
+			int32 SiblingColumnX = X + Offset.X;
+			int32 SiblingColumnY = Y + Offset.Y;
+			if (0 > SiblingColumnX || SiblingColumnX >= LevelGrid.Num())
+			{
+				continue;
+			}
+
+			if (0 > SiblingColumnY || SiblingColumnY >= LevelGrid[SiblingColumnX].Num())
+			{
+				continue;
+			}
+
+			const auto& SiblingColumn = LevelGrid[SiblingColumnX][SiblingColumnY];
+
+			for (const auto& SiblingNode : SiblingColumn)
+			{
+				TArray<VoxelEngine::Navigation::ENavLinkPermissions> Links{};
+				for (const auto& SiblingChild : SiblingNode->Children)
+				{
+					for (int Link = 0; Link < SiblingChild->SiblingsNum(); Link++)
+					{
+						auto LinkRules = SiblingChild->GetSiblingLink(Link).Value;
+						const auto& LinkedNode = SiblingChild->GetSiblingLink(Link).Key;
+						if (Node->Children.Contains(LinkedNode))
+						{
+							for (const auto& LinkRule : LinkRules)
+							{
+								Links.AddUnique(LinkRule);
+							}
+						}
+					}
+				}
+
+				if (Links.Num() > 0)
+				{
+					Node->LinkSibling(SiblingNode, Links);
+				}
+			}
+		}
+	}
+}
+
 NavLevelGrid UVoxelNavManagerComponent::CreateNavLevel(const NavLevelGrid& PreviousLevel, int32 Level)
 {
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
@@ -130,93 +218,15 @@ NavLevelGrid UVoxelNavManagerComponent::CreateNavLevel(const NavLevelGrid& Previ
 	{
 		for (int Y = 0; Y < GridSizeY; Y++)
 		{
-			int PrevLevelMinX = X * 2;
-			int PrevLevelMaxX = (X + 1) * 2;
-			int PrevLevelMinY = Y * 2;
-			int PrevLevelMaxY = (Y + 1) * 2;
-
-			TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>> CellNodes;
-			for (int PrevX = PrevLevelMinX; PrevX < PrevLevelMaxX && PrevX < PreviousLevel.Num(); PrevX++)
-			{
-				for (int PrevY = PrevLevelMinY; PrevY < PrevLevelMaxY && PrevY < PreviousLevel[PrevX].Num(); PrevY++)
-				{
-					for (const auto& PrevLevelNode : PreviousLevel[PrevX][PrevY] )
-					{
-						CellNodes.Add(PrevLevelNode);
-					}
-				}
-			}
-
-			auto GraphComponents = GetGraphComponents(CellNodes);
-			for (const auto& Component : GraphComponents)
-			{
-				FIntBox BoundingBox = GetBoundingBox(Component);
-				TSharedPtr<VoxelEngine::Navigation::NavNode> Parent = TSharedPtr<VoxelEngine::Navigation::NavNode>(new VoxelEngine::Navigation::NavNode(BoundingBox, Level));
-				for (const auto& Node : Component)
-				{
-					Parent->Children.Add(Node);
-					Node->Parent = Parent;
-				}
-				LevelGrid[X][Y].Add(Parent);
-			}
+			CreateNavLevelNodes(LevelGrid, PreviousLevel, X, Y, Level);
 		}
 	}
-
-	const TStaticArray<FIntVector, 4> SiblingsOffsetsXy{
-		FIntVector(1, 0, 0),
-		FIntVector(0, 1, 0),
-		FIntVector(-1, 0, 0),
-		FIntVector(0, -1, 0),
-	};
 
 	for (int X = 0; X < GridSizeX; X++)
 	{
 		for (int Y = 0; Y < GridSizeY; Y++)
 		{
-			for (const auto& Node : LevelGrid[X][Y])
-			{
-				for (const FIntVector& Offset : SiblingsOffsetsXy)
-				{
-					int32 SiblingColumnX = X + Offset.X;
-					int32 SiblingColumnY = Y + Offset.Y;
-					if (0 > SiblingColumnX || SiblingColumnX >= LevelGrid.Num())
-					{
-						continue;
-					}
-					
-					if (0 > SiblingColumnY || SiblingColumnY >= LevelGrid[SiblingColumnX].Num())
-					{
-						continue;
-					}
-					
-					const auto& SiblingColumn = LevelGrid[SiblingColumnX][SiblingColumnY];
-
-					for (const auto& SiblingNode : SiblingColumn)
-					{
-						TArray<VoxelEngine::Navigation::ENavLinkPermissions> Links{};
-						for (const auto& SiblingChild : SiblingNode->Children)
-						{
-							for (int Link = 0; Link < SiblingChild->SiblingsNum(); Link++)
-							{
-								auto LinkRules = SiblingChild->GetSiblingLink(Link).Value;
-								const auto& LinkedNode = SiblingChild->GetSiblingLink(Link).Key;
-								if (Node->Children.Contains(LinkedNode))
-								{
-									for (const auto& LinkRule : LinkRules)
-									{
-										Links.AddUnique(LinkRule);
-									}
-								}
-							}
-						}
-
-						if (Links.Num() > 0)
-						{
-							Node->LinkSibling(SiblingNode, Links);
-						}
-					}
-				}
-			}
+			LinkNavLevelNodes(LevelGrid, X, Y);
 		}
 	}
 
