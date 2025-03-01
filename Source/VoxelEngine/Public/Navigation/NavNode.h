@@ -11,19 +11,18 @@ namespace VoxelEngine::Navigation
 	public:
 		FIntBox Bounds;
 		uint8 Level;
-		NavNode* Parent = nullptr;
-		TArray<NavNode*> Children{};
+		TWeakPtr<NavNode> Parent = nullptr;
+		TArray<TSharedPtr<NavNode>> Children{};
 
 		NavNode(const FIntBox& Bounds, uint8 Level);
-		void LinkSibling(NavNode* Sibling, ENavLinkPermissions Permissions);
+		void LinkSibling(TWeakPtr<NavNode> Sibling, TArray<ENavLinkPermissions> Permissions);
 		void UnlinkSibling(NavNode* Sibling);
 		int32 SiblingsNum() const;
 
-
-		TPair<NavNode*, ENavLinkPermissions> GetSiblingLink(int32 Index) const;
+		TPair<TWeakPtr<NavNode>, TArray<ENavLinkPermissions>> GetSiblingLink(int32 Index) const;
 
 	private:
-		TArray<NavNode*> Siblings{};
-		TArray<ENavLinkPermissions> SiblingsPermissions{};
+		TArray<TWeakPtr<NavNode>> Siblings{};
+		TArray<TArray<ENavLinkPermissions>> SiblingsPermissions{};
 	};
 }

@@ -9,6 +9,7 @@
 #include "VoxelEngine/Public/DataStructures/RStarTree.h"
 #include "VoxelNavManagerComponent.generated.h"
 
+using NavLevelGrid = TArray<TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>>>;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class VOXELENGINE_API UVoxelNavManagerComponent : public UActorComponent
@@ -33,8 +34,14 @@ private:
 	UPROPERTY(EditAnywhere)
 	bool bDebugDrawNavVolumes = true;
 
+	UPROPERTY(EditAnywhere)
+	int DebugDrawNavNodesLevelMin = 0;
+
+	UPROPERTY(EditAnywhere)
+	int DebugDrawNavNodesLevelMax = 2;
+
 	UPROPERTY(EditDefaultsOnly)
-	int32 NavHierarchyLevelsNum = 8;
+	int32 NavHierarchyLevelsNum = 3;
 
 	UPROPERTY(EditDefaultsOnly)
 	int32 MaxJumpHeight = 1;
@@ -45,10 +52,24 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	int32 NavAgentHeight = 2;
 
-	TArray<TArray<TArray<VoxelEngine::Navigation::NavNode*>>> WalkableVoxelNodes;
+	NavLevelGrid TopLevelNodes;
 
 	FVoxelNavGenerationFinished GenerationFinishedCallback;
 
 	bool IsVoxelWalkable(const FIntVector& Coord, int32 AgentHeight) const;
-	void CreateSiblingLinks(VoxelEngine::Navigation::NavNode*);
+	void CreateLevelZeroSiblingLinks(VoxelEngine::Navigation::NavNode* WalkableNode, const NavLevelGrid& LevelZeroNodes);
+
+	NavLevelGrid CreateNavLevel(const NavLevelGrid& PreviousLevel, int32 Level);
+
+	void DeepFirstSearch(
+		TSharedPtr<VoxelEngine::Navigation::NavNode> Node,
+		const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph,
+		TSet<VoxelEngine::Navigation::NavNode*>& VisitedNodes, 
+		TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& GraphComponent
+	) const;
+
+	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> GetGraphComponents(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
+	FIntBox GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
+
+	void DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int Level) const;
 };

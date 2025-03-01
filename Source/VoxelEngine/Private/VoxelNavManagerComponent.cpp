@@ -43,7 +43,7 @@ bool UVoxelNavManagerComponent::IsVoxelWalkable(const FIntVector& Coord, int32 A
 	return true;
 }
 
-void UVoxelNavManagerComponent::CreateSiblingLinks(VoxelEngine::Navigation::NavNode* Node)
+void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigation::NavNode* Node, const NavLevelGrid& LevelZeroNodes)
 {
 	const FIntVector& Coord = Node->Bounds.Min;
 
@@ -68,9 +68,9 @@ void UVoxelNavManagerComponent::CreateSiblingLinks(VoxelEngine::Navigation::NavN
 		{
 			continue;
 		}
-		const TArray<VoxelEngine::Navigation::NavNode*>& NodesColumn = WalkableVoxelNodes[ColumnCoord.X][ColumnCoord.Y];
+		const auto& NodesColumn = LevelZeroNodes[ColumnCoord.X][ColumnCoord.Y];
 		int LastSolidZ = WorldHeight + 1;
-		for (auto* OffsetNode : NodesColumn)
+		for (const auto& OffsetNode : NodesColumn)
 		{
 			int32 Z = OffsetNode->Bounds.Min.Z;
 			LastSolidZ = Z;
@@ -81,13 +81,13 @@ void UVoxelNavManagerComponent::CreateSiblingLinks(VoxelEngine::Navigation::NavN
 
 			if (Z == Coord.Z)
 			{
-				Node->LinkSibling(OffsetNode, VoxelEngine::Navigation::ENavLinkPermissions::None);
+				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::None});
 				continue;
 			}
 
 			if (Z > Coord.Z)
 			{
-				Node->LinkSibling(OffsetNode, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp);
+				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpUp});
 				continue;
 			}
 
@@ -96,9 +96,278 @@ void UVoxelNavManagerComponent::CreateSiblingLinks(VoxelEngine::Navigation::NavN
 				continue;
 			}
 
-			Node->LinkSibling(OffsetNode, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown);
+			Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpDown});
 		}
 	}
+}
+
+NavLevelGrid UVoxelNavManagerComponent::CreateNavLevel(const NavLevelGrid& PreviousLevel, int32 Level)
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+	FIntVector WorldSize = VoxelWorld->GetWorldSizeVoxel();
+	int PreviousNodeSize = 1 << (Level - 1);
+	int32 NodeSize = 1 << Level;
+	int32 GridSizeX = WorldSize.X / NodeSize;
+	if (WorldSize.X % NodeSize  != 0)
+	{
+		GridSizeX++;
+	}
+	int32 GridSizeY = WorldSize.Y / NodeSize;
+	if (WorldSize.Y % NodeSize != 0)
+	{
+		GridSizeY++;
+	}
+
+	NavLevelGrid LevelGrid;
+	LevelGrid.SetNum(GridSizeX);
+	for (int X = 0; X < GridSizeX; X++)
+	{
+		LevelGrid[X].SetNum(GridSizeY);
+	}
+
+	for (int X = 0; X < GridSizeX; X++)
+	{
+		for (int Y = 0; Y < GridSizeY; Y++)
+		{
+			int PrevLevelMinX = X * 2;
+			int PrevLevelMaxX = (X + 1) * 2;
+			int PrevLevelMinY = Y * 2;
+			int PrevLevelMaxY = (Y + 1) * 2;
+
+			TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>> CellNodes;
+			for (int PrevX = PrevLevelMinX; PrevX < PrevLevelMaxX && PrevX < PreviousLevel.Num(); PrevX++)
+			{
+				for (int PrevY = PrevLevelMinY; PrevY < PrevLevelMaxY && PrevY < PreviousLevel[PrevX].Num(); PrevY++)
+				{
+					for (const auto& PrevLevelNode : PreviousLevel[PrevX][PrevY] )
+					{
+						CellNodes.Add(PrevLevelNode);
+					}
+				}
+			}
+
+			auto GraphComponents = GetGraphComponents(CellNodes);
+			for (const auto& Component : GraphComponents)
+			{
+				FIntBox BoundingBox = GetBoundingBox(Component);
+				TSharedPtr<VoxelEngine::Navigation::NavNode> Parent = TSharedPtr<VoxelEngine::Navigation::NavNode>(new VoxelEngine::Navigation::NavNode(BoundingBox, Level));
+				for (const auto& Node : Component)
+				{
+					Parent->Children.Add(Node);
+					Node->Parent = Parent;
+				}
+				LevelGrid[X][Y].Add(Parent);
+			}
+		}
+	}
+
+	const TStaticArray<FIntVector, 4> SiblingsOffsetsXy{
+		FIntVector(1, 0, 0),
+		FIntVector(0, 1, 0),
+		FIntVector(-1, 0, 0),
+		FIntVector(0, -1, 0),
+	};
+
+	for (int X = 0; X < GridSizeX; X++)
+	{
+		for (int Y = 0; Y < GridSizeY; Y++)
+		{
+			for (const auto& Node : LevelGrid[X][Y])
+			{
+				for (const FIntVector& Offset : SiblingsOffsetsXy)
+				{
+					int32 SiblingColumnX = X + Offset.X;
+					int32 SiblingColumnY = Y + Offset.Y;
+					if (0 > SiblingColumnX || SiblingColumnX >= LevelGrid.Num())
+					{
+						continue;
+					}
+					
+					if (0 > SiblingColumnY || SiblingColumnY >= LevelGrid[SiblingColumnX].Num())
+					{
+						continue;
+					}
+					
+					const auto& SiblingColumn = LevelGrid[SiblingColumnX][SiblingColumnY];
+
+					for (const auto& SiblingNode : SiblingColumn)
+					{
+						TArray<VoxelEngine::Navigation::ENavLinkPermissions> Links{};
+						for (const auto& SiblingChild : SiblingNode->Children)
+						{
+							for (int Link = 0; Link < SiblingChild->SiblingsNum(); Link++)
+							{
+								auto LinkRules = SiblingChild->GetSiblingLink(Link).Value;
+								const auto& LinkedNode = SiblingChild->GetSiblingLink(Link).Key;
+								if (Node->Children.Contains(LinkedNode))
+								{
+									for (const auto& LinkRule : LinkRules)
+									{
+										Links.AddUnique(LinkRule);
+									}
+								}
+							}
+						}
+
+						if (Links.Num() > 0)
+						{
+							Node->LinkSibling(SiblingNode, Links);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return LevelGrid;
+}
+
+void UVoxelNavManagerComponent::DeepFirstSearch(
+	TSharedPtr<VoxelEngine::Navigation::NavNode> Node,
+	const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph,
+	TSet<VoxelEngine::Navigation::NavNode*>& VisitedNodes,
+	TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& GraphComponent
+) const
+{
+	VisitedNodes.Add(Node.Get());
+	GraphComponent.Add(Node);
+	for (int I = 0; I < Node->SiblingsNum(); I++)
+	{
+		const auto& Sibling = Node->GetSiblingLink(I).Key;
+		bool bIsVisited = VisitedNodes.Contains(Sibling.Pin().Get());
+		if (bIsVisited)
+		{
+			continue;
+		}
+
+		bool bIsInGraph = false;
+		for (const auto& GraphNode : Graph)
+		{
+			if (GraphNode.Get() == Node.Get())
+			{
+				bIsInGraph = true;
+				break;
+			}
+		}
+
+		if (!bIsInGraph)
+		{
+			continue;
+		}
+
+		DeepFirstSearch(Sibling.Pin(), Graph, VisitedNodes, GraphComponent);
+	}
+}
+
+TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> UVoxelNavManagerComponent::GetGraphComponents(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const
+{
+	TSet<VoxelEngine::Navigation::NavNode*> VisitedNodes{};
+	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> Components{};
+	for (const auto& Node : Graph)
+	{
+		if (!VisitedNodes.Contains(Node.Get()))
+		{
+			TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>> Component{};
+			DeepFirstSearch(Node, Graph, VisitedNodes, Component);
+			Components.Add(Component);
+		}
+	}
+
+	return Components;
+}
+
+FIntBox UVoxelNavManagerComponent::GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const
+{
+	if (Graph.Num() == 0)
+	{
+		return FIntBox();
+	}
+	FIntVector Min = Graph[0]->Bounds.Min;
+	FIntVector Max = Graph[0]->Bounds.Max;
+	for(int I = 1; I < Graph.Num(); I++)
+	{
+		FIntVector NodeMin = Graph[I]->Bounds.Min;
+		FIntVector NodeMax = Graph[I]->Bounds.Max;
+		for (int Dim = 0; Dim < 3; Dim++)
+		{
+			if (NodeMin[Dim] < Min[Dim])
+			{
+				Min[Dim] = NodeMin[Dim];
+			}
+			if (NodeMax[Dim] > Max[Dim])
+			{
+				Max[Dim] = NodeMax[Dim];
+			}
+		}
+	}
+	return FIntBox(Min, Max);
+}
+
+void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int Level) const
+{
+	for (const auto& Child : Node->Children)
+	{
+		DebugDrawNavNode(Child.Get(), Level - 1);
+	}
+
+	if (DebugDrawNavNodesLevelMin > Level || Level > DebugDrawNavNodesLevelMax)
+	{
+		return;
+	}
+
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+	double VoxelSize = VoxelWorld->GetVoxelSizeWorld();
+
+	FBox NodeBox = Node->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
+	FIntVector NodeCoord = Node->Bounds.Min;
+
+	DrawDebugBox(GetWorld(), NodeBox.GetCenter(), NodeBox.GetExtent(), FColor::Magenta);
+
+	for (int I = 0; I < Node->SiblingsNum(); I++)
+	{
+		const auto& Sibling = Node->GetSiblingLink(I).Key;
+		auto LinkRules = Node->GetSiblingLink(I).Value;
+
+		
+		FBox SiblingBox = Sibling.Pin()->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
+
+		FIntVector SiblingCoord = Sibling.Pin()->Bounds.Min;
+		FIntVector SiblingOffset = SiblingCoord - NodeCoord;
+		FVector ArrowOffset;
+		if (SiblingOffset.X > 0 && SiblingOffset.Y == 0)
+		{
+			ArrowOffset = FVector::RightVector * VoxelSize * 0.1;
+		}
+		else if (SiblingOffset.X == 0 && SiblingOffset.Y > 0)
+		{
+			ArrowOffset = -FVector::ForwardVector * VoxelSize * 0.1;
+		}
+		else if (SiblingOffset.X < 0 && SiblingOffset.Y == 0)
+		{
+			ArrowOffset = -FVector::RightVector * VoxelSize * 0.1;
+		}
+		else if (SiblingOffset.X == 0 && SiblingOffset.Y < 0)
+		{
+			ArrowOffset = FVector::ForwardVector * VoxelSize * 0.1;
+		}
+
+		check(LinkRules.Num() > 0);
+		auto LinkRule = LinkRules[0];
+		FColor LineColor = FColor::Blue;
+		if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp))
+		{
+			LineColor = FColor::Green;
+		}
+		else if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown))
+		{
+			LineColor = FColor::Red;
+		}
+		DrawDebugDirectionalArrow(GetWorld(), NodeBox.GetCenter() + ArrowOffset, SiblingBox.GetCenter() + ArrowOffset, VoxelSize / 4, LineColor);
+	}
+
+	
 }
 
 void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -110,55 +379,13 @@ void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 
 	if (bDebugDrawNavVolumes)
 	{
-		for (int X = 0; X < WalkableVoxelNodes.Num(); X++)
+		for (int X = 0; X < TopLevelNodes.Num(); X++)
 		{
-			for (int Y = 0; Y < WalkableVoxelNodes[X].Num(); Y++)
+			for (int Y = 0; Y < TopLevelNodes[X].Num(); Y++)
 			{
-				for (auto* NavNode : WalkableVoxelNodes[X][Y])
+				for (const auto& Node : TopLevelNodes[X][Y])
 				{
-					double VoxelSize = VoxelWorld->GetVoxelSizeWorld();
-					FBox NodeBox = NavNode->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
-					FIntVector NodeCoord = NavNode->Bounds.Min;
-					// NodeBox = NodeBox.ExpandBy(-FVector(VoxelSize, VoxelSize, VoxelSize) / 10);
-					// DrawDebugBox(GetWorld(), NodeBox.GetCenter(), NodeBox.GetExtent(), FColor::Magenta);
-					for (int32 I = 0; I < NavNode->SiblingsNum(); I++)
-					{
-						auto SiblingPermissionPair = NavNode->GetSiblingLink(I);
-						auto* Sibling = SiblingPermissionPair.Key;
-						FBox SiblingBox = Sibling->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
-						
-						FIntVector SiblingCoord = Sibling->Bounds.Min;
-						FIntVector SiblingOffset = SiblingCoord - NodeCoord;
-						FVector ArrowOffset;
-						if (SiblingOffset.X > 0 && SiblingOffset.Y == 0)
-						{
-							ArrowOffset = FVector::RightVector * VoxelSize * 0.1;
-						}
-						else if (SiblingOffset.X == 0 && SiblingOffset.Y > 0)
-						{
-							ArrowOffset = -FVector::ForwardVector * VoxelSize * 0.1;
-						}
-						else if (SiblingOffset.X < 0 && SiblingOffset.Y == 0)
-						{
-							ArrowOffset = -FVector::RightVector * VoxelSize * 0.1;
-						}
-						else if (SiblingOffset.X == 0 && SiblingOffset.Y < 0)
-						{
-							ArrowOffset = FVector::ForwardVector * VoxelSize * 0.1;
-						}
-						
-						auto Permissions = SiblingPermissionPair.Value;
-						FColor LineColor = FColor::Blue;
-						if (VoxelEngine::Navigation::HasFlags(Permissions, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp))
-						{
-							LineColor = FColor::Green;
-						}
-						else if (VoxelEngine::Navigation::HasFlags(Permissions, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown))
-						{
-							LineColor = FColor::Red;
-						}
-						DrawDebugDirectionalArrow(GetWorld(), NodeBox.GetCenter() + ArrowOffset, SiblingBox.GetCenter() + ArrowOffset, VoxelSize / 4, LineColor);
-					}
+					DebugDrawNavNode(Node.Get(), NavHierarchyLevelsNum - 1);
 				}
 			}
 		}
@@ -167,12 +394,14 @@ void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 
 void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinished& Callback)
 {
-	WalkableVoxelNodes.Empty();
+	TopLevelNodes.Empty();
 
 	GenerationFinishedCallback = Callback;
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	check(VoxelWorld);
 	FIntVector WorldSizeVoxel = VoxelWorld->GetWorldSizeVoxel();
+
+	NavLevelGrid WalkableVoxelNodes;
 
 	WalkableVoxelNodes.SetNum(WorldSizeVoxel.X);
 	for (int X = 0; X < WorldSizeVoxel.X; X++)
@@ -192,7 +421,7 @@ void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinishe
 					continue;
 				}
 
-				auto* Node = new VoxelEngine::Navigation::NavNode(FIntBox(VoxelCoord, VoxelCoord), 0);
+				auto Node = TSharedPtr<VoxelEngine::Navigation::NavNode>(new VoxelEngine::Navigation::NavNode(FIntBox(VoxelCoord, VoxelCoord), 0));
 				WalkableVoxelNodes[X][Y].Add(Node);
 			}
 		}
@@ -202,11 +431,18 @@ void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinishe
 	{
 		for (int Y = 0; Y < WorldSizeVoxel.Y; Y++)
 		{
-			for (auto* NavNode : WalkableVoxelNodes[X][Y])
+			for (const auto& NavNode : WalkableVoxelNodes[X][Y])
 			{
-				CreateSiblingLinks(NavNode);
+				CreateLevelZeroSiblingLinks(NavNode.Get(), WalkableVoxelNodes);
 			}
 		}
+	}
+
+	TopLevelNodes = WalkableVoxelNodes;
+
+	for (int32 Level = 1; Level < NavHierarchyLevelsNum; Level++)
+	{
+		TopLevelNodes = CreateNavLevel(TopLevelNodes, Level);
 	}
 
 	GenerationFinishedCallback.ExecuteIfBound();
