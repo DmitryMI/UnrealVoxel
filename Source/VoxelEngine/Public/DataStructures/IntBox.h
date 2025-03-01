@@ -68,7 +68,7 @@ namespace VoxelEngine::DataStructures
 
 		UE::Math::TIntVector3<T> GetSize() const
 		{
-			return UE::Math::TIntVector3<T>(Max.X - Min.X, Max.Y - Min.Y, Max.Z - Min.Z);
+			return UE::Math::TIntVector3<T>(Max.X - Min.X + 1, Max.Y - Min.Y + 1, Max.Z - Min.Z + 1);
 		}
 
 		T GetVolume() const
@@ -80,7 +80,7 @@ namespace VoxelEngine::DataStructures
 		FBox ToBox(double VoxelSize) const
 		{
 			FVector MinF = FVector(Min) * VoxelSize;
-			FVector MaxF = FVector(Max) * VoxelSize;
+			FVector MaxF = FVector(Max + UE::Math::TIntVector3<T>{1, 1, 1})* VoxelSize;
 			return FBox(MinF, MaxF);
 		}
 	};

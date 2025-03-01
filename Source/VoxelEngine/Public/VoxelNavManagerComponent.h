@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "VoxelChange.h"
-#include "VoxelEngine/Public/Navigation/NavVolume.h"
+#include "VoxelEngine/Public/Navigation/NavNode.h"
 #include "VoxelEngine/Public/DataStructures/RStarTree.h"
 #include "VoxelNavManagerComponent.generated.h"
 
@@ -30,8 +30,25 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	UPROPERTY(EditAnywhere)
+	bool bDebugDrawNavVolumes = true;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 NavHierarchyLevelsNum = 8;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 MaxJumpHeight = 1;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 MaxFallHeight = 3;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 NavAgentHeight = 2;
+
+	TArray<TArray<TArray<VoxelEngine::Navigation::NavNode*>>> WalkableVoxelNodes;
+
 	FVoxelNavGenerationFinished GenerationFinishedCallback;
 
-	TDoubleLinkedList<TUniquePtr<VoxelEngine::Navigation::NavVolume>> NavVolumes;
-	VoxelEngine::DataStructures::TRStarTree<VoxelEngine::Navigation::NavVolume*> NavVolumesRTree;
+	bool IsVoxelWalkable(const FIntVector& Coord, int32 AgentHeight) const;
+	void CreateSiblingLinks(VoxelEngine::Navigation::NavNode*);
 };

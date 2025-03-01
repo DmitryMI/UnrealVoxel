@@ -98,6 +98,44 @@ bool UVoxelQueryUtils::VoxelBoxOverlapFilterMulti(AVoxelWorld* VoxelWorld, const
 	return OverlappedVoxels.Num() > 0;
 }
 
+bool UVoxelQueryUtils::VoxelIntBoxOverlapFilterSingle(AVoxelWorld* VoxelWorld, const FIntBox& VoxelBox, FIntVector& OutHit, const FVoxelQueryFilterParams& Params)
+{
+	bool bWorldValid = IsValid(VoxelWorld);
+	ensureMsgf(bWorldValid, TEXT("VoxelWorld is nullptr"));
+	if (!bWorldValid)
+	{
+		return false;
+	}
+
+	FIntVector WorldSize = VoxelWorld->GetWorldSizeVoxel();
+	FIntBox WorldVoxelBox(FIntVector{ 0, 0, 0 }, WorldSize);
+	if (!WorldVoxelBox.Intersect(VoxelBox))
+	{
+		return false;
+	}
+
+	FIntVector MinVoxel = VoxelBox.Min;
+	FIntVector MaxVoxel = VoxelBox.Max;
+
+	for (int X = MinVoxel.X; X <= MaxVoxel.X; X++)
+	{
+		for (int Y = MinVoxel.Y; Y <= MaxVoxel.Y; Y++)
+		{
+			for (int Z = MinVoxel.Z; Z <= MaxVoxel.Z; Z++)
+			{
+				FIntVector Coord{ X, Y, Z };
+				if (CheckIfVoxelSatisfiesQueryFilter(VoxelWorld, Coord, Params))
+				{
+					OutHit = Coord;
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 bool UVoxelQueryUtils::CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params)
 {
 	if (!VoxelWorld->IsValidCoordinate(Coord))

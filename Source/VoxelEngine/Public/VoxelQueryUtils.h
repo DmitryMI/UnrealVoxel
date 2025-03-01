@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "VoxelWorld.h"
+#include "VoxelEngine/Public/DataStructures/IntBox.h"
 #include "VoxelQueryUtils.generated.h"
 
 UENUM()
@@ -53,6 +54,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Voxel Query Utils")
 	static bool VoxelBoxOverlapFilterMulti(AVoxelWorld* VoxelWorld, const FBox& BoxWorld, TArray<FIntVector>& OverlappedVoxels, const FVoxelQueryFilterParams& Params);
+
+	static bool VoxelIntBoxOverlapFilterSingle(AVoxelWorld* VoxelWorld, const FIntBox& VoxelBox, FIntVector& OutHit, const FVoxelQueryFilterParams& Params);
 private:
 	static bool CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params);
 

@@ -166,7 +166,7 @@ private:
 	UPROPERTY()
 	UVoxelWorldGenerator* VoxelWorldGeneratorInstance = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	UVoxelNavManagerComponent* VoxelNavManagerComponent = nullptr;
 
 	std::vector<Voxel> Voxels;
