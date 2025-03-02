@@ -130,6 +130,18 @@ public:
 	UFUNCTION(BlueprintCallable)
 	EVoxelChangeResult ChangeVoxel(const FIntVector& Coord, int32 DesiredVoxelType);
 
+	template<typename T>
+	T* GetWorldGeneratorInstance() const
+	{
+		return Cast<T>(VoxelWorldGeneratorInstance);
+	}
+
+	UFUNCTION(BlueprintCallable)
+	UVoxelWorldGenerator* GetWorldGeneratorInstanceB() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldGeneratorInstance(UVoxelWorldGenerator* Instance);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

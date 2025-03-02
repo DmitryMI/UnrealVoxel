@@ -86,13 +86,15 @@ void AVoxelWorld::ResetWorld()
 
 	Chunks.Empty();
 
-	if (!VoxelWorldGeneratorClass)
+	if (!VoxelWorldGeneratorInstance)
 	{
-		UE_LOG(LogVoxelEngine, Error, TEXT("Voxel World Generator class not set!"));
-		return;
+		if (!VoxelWorldGeneratorClass)
+		{
+			UE_LOG(LogVoxelEngine, Error, TEXT("Voxel World Generator class not set!"));
+			return;
+		}
+		VoxelWorldGeneratorInstance = NewObject<UVoxelWorldGenerator>(this, VoxelWorldGeneratorClass, FName("VoxelWorldGeneratorInstance"));
 	}
-
-	VoxelWorldGeneratorInstance = NewObject<UVoxelWorldGenerator>(this, VoxelWorldGeneratorClass, FName("VoxelWorldGeneratorInstance"));
 	check(VoxelWorldGeneratorInstance);
 
 	FIntVector2 GeneratorWantsSize = VoxelWorldGeneratorInstance->GetWantedWorldSizeVoxels();
@@ -141,6 +143,16 @@ FBox AVoxelWorld::GetBoundingBoxWorld() const
 	FIntVector WorldSizeVoxel = GetWorldSizeVoxel();
 	FVector WorldSize = FVector(WorldSizeVoxel) * VoxelSizeWorld;
 	return FBox(GetActorLocation(), GetActorLocation() + WorldSize);
+}
+
+UVoxelWorldGenerator* AVoxelWorld::GetWorldGeneratorInstanceB() const
+{
+	return VoxelWorldGeneratorInstance;
+}
+
+void AVoxelWorld::SetWorldGeneratorInstance(UVoxelWorldGenerator* Instance)
+{
+	VoxelWorldGeneratorInstance = Instance;
 }
 
 // Called when the game starts or when spawned
