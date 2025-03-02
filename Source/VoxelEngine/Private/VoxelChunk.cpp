@@ -615,6 +615,13 @@ void UVoxelChunk::ChangeVoxelRendering(const FVoxelChange& VoxelChange)
 	VoxelChangeRequests.Enqueue(VoxelChange);
 }
 
+void UVoxelChunk::DestroyComponent(bool bPromoteChildren)
+{
+	DynamicMeshComponent->DestroyComponent(bPromoteChildren);
+
+	Super::DestroyComponent(bPromoteChildren);
+}
+
 void UVoxelChunk::RegenerateMesh()
 {
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();

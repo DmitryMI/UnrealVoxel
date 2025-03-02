@@ -73,7 +73,7 @@ public:
 
 	void ChangeVoxelRendering(const FVoxelChange& VoxelChange);
 
-
+	virtual void DestroyComponent(bool bPromoteChildren = false) override;
 protected:
 	// Called when the game starts
 	void BeginPlay() override;

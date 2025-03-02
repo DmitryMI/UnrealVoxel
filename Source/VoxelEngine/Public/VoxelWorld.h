@@ -62,6 +62,9 @@ public:
 	void RegenerateChunkMeshes();
 
 	UFUNCTION(BlueprintCallable)
+	void ResetWorld();
+
+	UFUNCTION(BlueprintCallable)
 	FIntVector GetWorldSizeVoxel() const;
 
 	UFUNCTION(BlueprintCallable)

@@ -76,27 +76,15 @@ void AVoxelWorld::RegenerateChunkMeshes()
 	}
 }
 
-FIntVector AVoxelWorld::GetWorldSizeVoxel() const
+void AVoxelWorld::ResetWorld()
 {
-	return FIntVector(ChunkWorldDimensions.X * ChunkSide, ChunkWorldDimensions.Y * ChunkSide, WorldHeight);
-}
-
-FBox AVoxelWorld::GetBoundingBoxWorld() const
-{
-	FIntVector WorldSizeVoxel = GetWorldSizeVoxel();
-	FVector WorldSize = FVector(WorldSizeVoxel) * VoxelSizeWorld;
-	return FBox(GetActorLocation(), GetActorLocation() + WorldSize);
-}
-
-// Called when the game starts or when spawned
-void AVoxelWorld::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (!InitializeMaterials())
+	Voxels.clear();
+	for (UVoxelChunk* Chunk : Chunks)
 	{
-		return;
+		Chunk->DestroyComponent(true);
 	}
+
+	Chunks.Empty();
 
 	if (!VoxelWorldGeneratorClass)
 	{
@@ -141,6 +129,31 @@ void AVoxelWorld::BeginPlay()
 	UVoxelWorldGenerator::FVoxelWorlGenerationFinished Callback;
 	Callback.BindUFunction(this, FName("WorldGenerationFinishedCallback"));
 	VoxelWorldGeneratorInstance->GenerateWorld(this, Callback);
+}
+
+FIntVector AVoxelWorld::GetWorldSizeVoxel() const
+{
+	return FIntVector(ChunkWorldDimensions.X * ChunkSide, ChunkWorldDimensions.Y * ChunkSide, WorldHeight);
+}
+
+FBox AVoxelWorld::GetBoundingBoxWorld() const
+{
+	FIntVector WorldSizeVoxel = GetWorldSizeVoxel();
+	FVector WorldSize = FVector(WorldSizeVoxel) * VoxelSizeWorld;
+	return FBox(GetActorLocation(), GetActorLocation() + WorldSize);
+}
+
+// Called when the game starts or when spawned
+void AVoxelWorld::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!InitializeMaterials())
+	{
+		return;
+	}
+
+	ResetWorld();
 }
 
 void AVoxelWorld::PostInitProperties()
