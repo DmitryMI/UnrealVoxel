@@ -56,6 +56,9 @@ public:
 	static bool VoxelBoxOverlapFilterMulti(AVoxelWorld* VoxelWorld, const FBox& BoxWorld, TArray<FIntVector>& OverlappedVoxels, const FVoxelQueryFilterParams& Params);
 
 	static bool VoxelIntBoxOverlapFilterSingle(AVoxelWorld* VoxelWorld, const FIntBox& VoxelBox, FIntVector& OutHit, const FVoxelQueryFilterParams& Params);
+
+	UFUNCTION(BlueprintCallable, Category = "Voxel Query Utils")
+	static bool GetLookedThroughAdjacentVoxel(AVoxelWorld* VoxelWorld, const FIntVector& VoxelCoord, const FVector& RayOrigin, FVector RayDirection, FIntVector& OutAdjacentVoxel);
 private:
 	static bool CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params);
 

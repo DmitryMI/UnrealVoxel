@@ -136,6 +136,41 @@ bool UVoxelQueryUtils::VoxelIntBoxOverlapFilterSingle(AVoxelWorld* VoxelWorld, c
 	return false;
 }
 
+bool UVoxelQueryUtils::GetLookedThroughAdjacentVoxel(AVoxelWorld* VoxelWorld, const FIntVector& VoxelCoord, const FVector& RayOrigin, FVector RayDirection, FIntVector& OutAdjacentVoxel)
+{
+	check(VoxelWorld);
+	if (RayDirection.IsNearlyZero())
+	{
+		return false;
+	}
+	if (!RayDirection.IsNormalized())
+	{
+		RayDirection = RayDirection.GetUnsafeNormal();
+	}
+
+	FBox VoxelBox = VoxelWorld->GetVoxelBoundingBox(VoxelCoord);
+	FVector TMin = (VoxelBox.Min - RayOrigin) / RayDirection;
+	FVector TMax = (VoxelBox.Max - RayOrigin) / RayDirection;
+	
+	FVector T1{ FMath::Min(TMin.X, TMax.X), FMath::Min(TMin.Y, TMax.Y), FMath::Min(TMin.Z, TMax.Z) };
+	FVector T2{ FMath::Max(TMin.X, TMax.X), FMath::Max(TMin.Y, TMax.Y), FMath::Max(TMin.Z, TMax.Z) };
+
+	double TEnter = FMath::Max3(T1.X, T1.Y, T1.Z);
+	double TExit = FMath::Min3(T2.X, T2.Y, T2.Z);
+
+	if (TEnter <= TExit && TExit >= 0)
+	{
+		int IndexMax = FMath::Max3Index(T1.X, T1.Y, T1.Z);
+		int DirectionSign = -FMath::Sign(RayDirection[IndexMax]);
+		FIntVector Offset{ 0, 0, 0 };
+		Offset[IndexMax] = DirectionSign;
+		OutAdjacentVoxel = VoxelCoord + Offset;
+		return true;
+	}
+
+	return false;
+}
+
 bool UVoxelQueryUtils::CheckIfVoxelSatisfiesQueryFilter(AVoxelWorld* VoxelWorld, const FIntVector& Coord, const FVoxelQueryFilterParams& Params)
 {
 	if (!VoxelWorld->IsValidCoordinate(Coord))

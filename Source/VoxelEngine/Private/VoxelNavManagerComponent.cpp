@@ -316,9 +316,12 @@ FIntBox UVoxelNavManagerComponent::GetBoundingBox(const TArray<TSharedPtr<VoxelE
 
 void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int Level) const
 {
-	for (const auto& Child : Node->Children)
+	if (Level > DebugDrawNavNodesLevelMin)
 	{
-		DebugDrawNavNode(Child.Get(), Level - 1);
+		for (const auto& Child : Node->Children)
+		{
+			DebugDrawNavNode(Child.Get(), Level - 1);
+		}
 	}
 
 	if (DebugDrawNavNodesLevelMin > Level || Level > DebugDrawNavNodesLevelMax)
@@ -340,7 +343,6 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 		const auto& Sibling = Node->GetSiblingLink(I).Key;
 		auto LinkRules = Node->GetSiblingLink(I).Value;
 
-		
 		FBox SiblingBox = Sibling.Pin()->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
 
 		FIntVector SiblingCoord = Sibling.Pin()->Bounds.Min;
@@ -376,8 +378,6 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 		}
 		DrawDebugDirectionalArrow(GetWorld(), NodeBox.GetCenter() + ArrowOffset, SiblingBox.GetCenter() + ArrowOffset, VoxelSize / 4, LineColor);
 	}
-
-	
 }
 
 void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
