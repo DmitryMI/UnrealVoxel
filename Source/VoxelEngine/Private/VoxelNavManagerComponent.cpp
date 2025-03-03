@@ -142,56 +142,52 @@ void UVoxelNavManagerComponent::CreateNavLevelNodes(NavLevelGrid& LevelGrid, con
 
 void UVoxelNavManagerComponent::LinkNavLevelNodes(NavLevelGrid& LevelGrid, int32 X, int32 Y) const
 {
-	const TStaticArray<FIntVector, 4> SiblingsOffsetsXy{
-		FIntVector(1, 0, 0),
-		FIntVector(0, 1, 0),
-		FIntVector(-1, 0, 0),
-		FIntVector(0, -1, 0),
-	};
-
 	for (const auto& Node : LevelGrid[X][Y])
 	{
-		for (const FIntVector& Offset : SiblingsOffsetsXy)
+		LinkNavLevelNodes(Node.Get());
+	}
+}
+
+void UVoxelNavManagerComponent::LinkNavLevelNodes(VoxelEngine::Navigation::NavNode* Node) const
+{
+	check(Node);
+	TMap<TSharedPtr<VoxelEngine::Navigation::NavNode>, TArray<VoxelEngine::Navigation::ENavLinkPermissions>> NodeLinkMap;
+	for (const auto& Child : Node->Children)
+	{
+		for (int I = 0; I < Child->SiblingsNum(); I++)
 		{
-			int32 SiblingColumnX = X + Offset.X;
-			int32 SiblingColumnY = Y + Offset.Y;
-			if (0 > SiblingColumnX || SiblingColumnX >= LevelGrid.Num())
+			const auto& ChildSiblingWeak = Child->GetSiblingLink(I).Key;
+			auto ChildSiblingLinkRules = Child->GetSiblingLink(I).Value;
+			const auto& ChildSibling = ChildSiblingWeak.Pin();
+			if (!ChildSibling->Parent.IsValid() || ChildSibling->Parent.Pin().Get() == Node)
 			{
 				continue;
 			}
-
-			if (0 > SiblingColumnY || SiblingColumnY >= LevelGrid[SiblingColumnX].Num())
+			const auto& ChildSiblingParent = ChildSibling->Parent.Pin();
+			
+			if (NodeLinkMap.Contains(ChildSiblingParent))
 			{
-				continue;
+				TArray<VoxelEngine::Navigation::ENavLinkPermissions>& LinkRules = NodeLinkMap[ChildSiblingParent];
+				for (const auto& ChildSiblingLinkRule : ChildSiblingLinkRules)
+				{
+					LinkRules.AddUnique(ChildSiblingLinkRule);
+				}
 			}
-
-			const auto& SiblingColumn = LevelGrid[SiblingColumnX][SiblingColumnY];
-
-			for (const auto& SiblingNode : SiblingColumn)
+			else
 			{
-				TArray<VoxelEngine::Navigation::ENavLinkPermissions> Links{};
-				for (const auto& SiblingChild : SiblingNode->Children)
+				TArray<VoxelEngine::Navigation::ENavLinkPermissions> LinkRules;
+				for (const auto& ChildSiblingLinkRule : ChildSiblingLinkRules)
 				{
-					for (int Link = 0; Link < SiblingChild->SiblingsNum(); Link++)
-					{
-						auto LinkRules = SiblingChild->GetSiblingLink(Link).Value;
-						const auto& LinkedNode = SiblingChild->GetSiblingLink(Link).Key;
-						if (Node->Children.Contains(LinkedNode))
-						{
-							for (const auto& LinkRule : LinkRules)
-							{
-								Links.AddUnique(LinkRule);
-							}
-						}
-					}
+					LinkRules.AddUnique(ChildSiblingLinkRule);
 				}
-
-				if (Links.Num() > 0)
-				{
-					Node->LinkSibling(SiblingNode, Links);
-				}
+				NodeLinkMap.Add(ChildSiblingParent, LinkRules);
 			}
 		}
+	}
+
+	for (const auto& Link : NodeLinkMap)
+	{
+		Node->LinkSibling(Link.Key, Link.Value);
 	}
 }
 
@@ -379,17 +375,22 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 		}
 
 		check(LinkRules.Num() > 0);
-		auto LinkRule = LinkRules[0];
-		FColor LineColor = FColor::Blue;
-		if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp))
+		int LinkIndex = 0;
+		for (const auto& LinkRule : LinkRules)
 		{
-			LineColor = FColor::Green;
+			FVector ArrowVerticalOffset = FVector{ 0, 0, VoxelSize * 0.1 * LinkIndex };
+			FColor LineColor = FColor::Blue;
+			if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp))
+			{
+				LineColor = FColor::Green;
+			}
+			else if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown))
+			{
+				LineColor = FColor::Red;
+			}
+			DrawDebugDirectionalArrow(GetWorld(), NodeBox.GetCenter() + ArrowOffset + ArrowVerticalOffset, SiblingBox.GetCenter() + ArrowOffset + ArrowVerticalOffset, VoxelSize / 4, LineColor);
+			LinkIndex++;
 		}
-		else if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown))
-		{
-			LineColor = FColor::Red;
-		}
-		DrawDebugDirectionalArrow(GetWorld(), NodeBox.GetCenter() + ArrowOffset, SiblingBox.GetCenter() + ArrowOffset, VoxelSize / 4, LineColor);
 	}
 }
 

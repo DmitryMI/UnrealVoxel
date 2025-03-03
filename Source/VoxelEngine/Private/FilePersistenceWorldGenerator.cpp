@@ -74,7 +74,7 @@ FIntVector2 UFilePersistenceWorldGenerator::GetWantedWorldSizeVoxels() const
 
     if (!BinaryFileReader)
     {
-        return FIntVector2(32, 32);
+        return NewWorldSize;
     }
     
     FIntVector2 WorldSize2D;

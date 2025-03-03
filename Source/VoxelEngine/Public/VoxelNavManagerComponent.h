@@ -65,6 +65,7 @@ private:
 
 	void CreateNavLevelNodes(NavLevelGrid& LevelGrid, const NavLevelGrid& PreviousLevel, int32 X, int32 Y, int32 Level) const;
 	void LinkNavLevelNodes(NavLevelGrid& LevelGrid, int32 X, int32 Y) const;
+	void LinkNavLevelNodes(VoxelEngine::Navigation::NavNode* Node) const;
 	NavLevelGrid CreateNavLevel(const NavLevelGrid& PreviousLevel, int32 Level);
 
 	void DeepFirstSearch(

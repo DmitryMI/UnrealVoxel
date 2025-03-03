@@ -25,6 +25,9 @@ public:
 	void GenerateWorld(AVoxelWorld* VoxelWorld, const FVoxelWorlGenerationFinished& Callback) override;
 	
 private:
+	UPROPERTY(EditDefaultsOnly)
+	FIntVector2 NewWorldSize = FIntVector2(16, 16);
+
 	FString LoadedFilePath;
 
 	bool ArePathsEqual(const FString& Path1, const FString& Path2) const;
