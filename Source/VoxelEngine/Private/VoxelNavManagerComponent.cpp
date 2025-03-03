@@ -73,30 +73,35 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 		for (const auto& OffsetNode : NodesColumn)
 		{
 			int32 Z = OffsetNode->Bounds.Min.Z;
-			LastSolidZ = Z;
+			
 			if (MinHeight > Z || Z > MaxHeight)
 			{
+				LastSolidZ = Z;
 				continue;
 			}
 
 			if (Z == Coord.Z)
 			{
 				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::None});
+				LastSolidZ = Z;
 				continue;
 			}
 
 			if (Z > Coord.Z)
 			{
 				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpUp});
+				LastSolidZ = Z;
 				continue;
 			}
 
-			if (LastSolidZ - Z > NavAgentHeight)
+			if (LastSolidZ - Node->Bounds.Min.Z < NavAgentHeight)
 			{
+				LastSolidZ = Z;
 				continue;
 			}
 
 			Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpDown});
+			LastSolidZ = Z;
 		}
 	}
 }
@@ -423,6 +428,7 @@ void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinished& Callback)
 {
 	TopLevelNodes.Empty();
+	WalkableVoxelNodes.Empty();
 
 	GenerationFinishedCallback = Callback;
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
