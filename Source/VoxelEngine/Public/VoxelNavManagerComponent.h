@@ -74,7 +74,7 @@ private:
 		TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& GraphComponent
 	) const;
 
-	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> GetGraphComponents(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
+	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> GetGraphComponents(TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
 	FIntBox GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
 
 	void DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int RecursionDirection) const;

@@ -5,6 +5,7 @@
 #include "VoxelWorld.h"
 #include "DrawDebugHelpers.h"
 #include "VoxelQueryUtils.h"
+#include "VoxelEngine/Public/Navigation/TarjanScc.h"
 
 // Sets default values for this component's properties
 UVoxelNavManagerComponent::UVoxelNavManagerComponent()
@@ -275,21 +276,10 @@ void UVoxelNavManagerComponent::DeepFirstSearch(
 	}
 }
 
-TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> UVoxelNavManagerComponent::GetGraphComponents(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const
+TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> UVoxelNavManagerComponent::GetGraphComponents(TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const
 {
-	TSet<VoxelEngine::Navigation::NavNode*> VisitedNodes{};
-	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> Components{};
-	for (const auto& Node : Graph)
-	{
-		if (!VisitedNodes.Contains(Node.Get()))
-		{
-			TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>> Component{};
-			DeepFirstSearch(Node, Graph, VisitedNodes, Component);
-			Components.Add(Component);
-		}
-	}
-
-	return Components;
+	VoxelEngine::Navigation::TarjanScc TarjanScc(Graph);
+	return TarjanScc.GetSccs();
 }
 
 FIntBox UVoxelNavManagerComponent::GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const
