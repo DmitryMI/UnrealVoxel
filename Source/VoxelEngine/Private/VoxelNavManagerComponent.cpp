@@ -413,7 +413,7 @@ void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 			{
 				for (const auto& Node : TopLevelNodes[X][Y])
 				{
-					DebugDrawNavNode(Node.Get(), NavHierarchyLevelsNum - 1);
+					DebugDrawNavNode(Node.Get(), -1);
 				}
 			}
 		}
