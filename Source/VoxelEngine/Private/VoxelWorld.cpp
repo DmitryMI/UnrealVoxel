@@ -81,7 +81,7 @@ void AVoxelWorld::ResetWorld()
 	Voxels.clear();
 	for (UVoxelChunk* Chunk : Chunks)
 	{
-		Chunk->DestroyComponent(true);
+		Chunk->DestroyComponent(false);
 	}
 
 	Chunks.Empty();

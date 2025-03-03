@@ -254,7 +254,7 @@ void UVoxelNavManagerComponent::DeepFirstSearch(
 		bool bIsInGraph = false;
 		for (const auto& GraphNode : Graph)
 		{
-			if (GraphNode.Get() == Node.Get())
+			if (GraphNode.Get() == Sibling.Pin().Get())
 			{
 				bIsInGraph = true;
 				break;
