@@ -1,7 +1,7 @@
 #pragma once
 
-#include "NavNode.h"
 #include "TarjanScc.h"
+#include "NavNode.h"
 
 namespace VoxelEngine::Navigation
 {

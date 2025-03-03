@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "VoxelNavManagerComponent.h"
 #include "VoxelWorld.h"
 #include "DrawDebugHelpers.h"
@@ -13,13 +12,10 @@ UVoxelNavManagerComponent::UVoxelNavManagerComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
-
 // Called when the game starts
 void UVoxelNavManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	
 }
 
 bool UVoxelNavManagerComponent::IsVoxelWalkable(const FIntVector& Coord, int32 AgentHeight) const
@@ -27,7 +23,7 @@ bool UVoxelNavManagerComponent::IsVoxelWalkable(const FIntVector& Coord, int32 A
 	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
 	check(VoxelWorld);
 	check(AgentHeight > 0);
-	
+
 	if (VoxelWorld->IsVoxelTraversable(Coord))
 	{
 		return false;
@@ -40,7 +36,7 @@ bool UVoxelNavManagerComponent::IsVoxelWalkable(const FIntVector& Coord, int32 A
 			return false;
 		}
 	}
-	
+
 	return true;
 }
 
@@ -61,7 +57,7 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 
 	int32 MinHeight = FMath::Max(0, Coord.Z - MaxFallHeight);
 	int32 MaxHeight = FMath::Min(WorldHeight, Coord.Z + MaxJumpHeight);
-	
+
 	for (const FIntVector& Offset : SiblingsOffsetsXy)
 	{
 		FIntVector ColumnCoord = Coord + Offset;
@@ -74,7 +70,7 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 		for (const auto& OffsetNode : NodesColumn)
 		{
 			int32 Z = OffsetNode->Bounds.Min.Z;
-			
+
 			if (MinHeight > Z || Z > MaxHeight)
 			{
 				LastSolidZ = Z;
@@ -83,14 +79,14 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 
 			if (Z == Coord.Z)
 			{
-				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::None});
+				Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::None });
 				LastSolidZ = Z;
 				continue;
 			}
 
 			if (Z > Coord.Z)
 			{
-				Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpUp});
+				Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpUp });
 				LastSolidZ = Z;
 				continue;
 			}
@@ -101,7 +97,7 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 				continue;
 			}
 
-			Node->LinkSibling(OffsetNode, {VoxelEngine::Navigation::ENavLinkPermissions::JumpDown});
+			Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpDown });
 			LastSolidZ = Z;
 		}
 	}
@@ -151,7 +147,7 @@ void UVoxelNavManagerComponent::LinkNavLevelNodes(NavLevelGrid& LevelGrid, int32
 void UVoxelNavManagerComponent::LinkNavLevelNodes(VoxelEngine::Navigation::NavNode* Node) const
 {
 	check(Node);
-	TMap<TSharedPtr<VoxelEngine::Navigation::NavNode>, TArray<VoxelEngine::Navigation::ENavLinkPermissions>> NodeLinkMap;
+	TMap<TSharedPtr<VoxelEngine::Navigation::NavNode>, TArray<EVoxelNavLinkPermissions>> NodeLinkMap;
 	for (const auto& Child : Node->Children)
 	{
 		for (int I = 0; I < Child->SiblingsNum(); I++)
@@ -164,10 +160,10 @@ void UVoxelNavManagerComponent::LinkNavLevelNodes(VoxelEngine::Navigation::NavNo
 				continue;
 			}
 			const auto& ChildSiblingParent = ChildSibling->Parent.Pin();
-			
+
 			if (NodeLinkMap.Contains(ChildSiblingParent))
 			{
-				TArray<VoxelEngine::Navigation::ENavLinkPermissions>& LinkRules = NodeLinkMap[ChildSiblingParent];
+				TArray<EVoxelNavLinkPermissions>& LinkRules = NodeLinkMap[ChildSiblingParent];
 				for (const auto& ChildSiblingLinkRule : ChildSiblingLinkRules)
 				{
 					LinkRules.AddUnique(ChildSiblingLinkRule);
@@ -175,7 +171,7 @@ void UVoxelNavManagerComponent::LinkNavLevelNodes(VoxelEngine::Navigation::NavNo
 			}
 			else
 			{
-				TArray<VoxelEngine::Navigation::ENavLinkPermissions> LinkRules;
+				TArray<EVoxelNavLinkPermissions> LinkRules;
 				for (const auto& ChildSiblingLinkRule : ChildSiblingLinkRules)
 				{
 					LinkRules.AddUnique(ChildSiblingLinkRule);
@@ -199,7 +195,7 @@ NavLevelGrid UVoxelNavManagerComponent::CreateNavLevel(const NavLevelGrid& Previ
 	int PreviousNodeSize = 1 << (Level - 1);
 	int32 NodeSize = 1 << Level;
 	int32 GridSizeX = WorldSize.X / NodeSize;
-	if (WorldSize.X % NodeSize  != 0)
+	if (WorldSize.X % NodeSize != 0)
 	{
 		GridSizeX++;
 	}
@@ -286,7 +282,7 @@ FIntBox UVoxelNavManagerComponent::GetBoundingBox(const TArray<TSharedPtr<VoxelE
 	}
 	FIntVector Min = Graph[0]->Bounds.Min;
 	FIntVector Max = Graph[0]->Bounds.Max;
-	for(int I = 1; I < Graph.Num(); I++)
+	for (int I = 1; I < Graph.Num(); I++)
 	{
 		FIntVector NodeMin = Graph[I]->Bounds.Min;
 		FIntVector NodeMax = Graph[I]->Bounds.Max;
@@ -380,11 +376,11 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 		{
 			FVector ArrowVerticalOffset = FVector{ 0, 0, VoxelSize * 0.1 * LinkIndex };
 			FColor LineColor = FColor::Blue;
-			if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpUp))
+			if (HasFlags(LinkRule, EVoxelNavLinkPermissions::JumpUp))
 			{
 				LineColor = FColor::Green;
 			}
-			else if (VoxelEngine::Navigation::HasFlags(LinkRule, VoxelEngine::Navigation::ENavLinkPermissions::JumpDown))
+			else if (HasFlags(LinkRule, EVoxelNavLinkPermissions::JumpDown))
 			{
 				LineColor = FColor::Red;
 			}
@@ -392,6 +388,65 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 			LinkIndex++;
 		}
 	}
+}
+
+TWeakPtr<VoxelEngine::Navigation::NavNode> UVoxelNavManagerComponent::ProjectOntoWalkableNode(const FVector& Location) const
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+	FIntVector Coord = VoxelWorld->GetVoxelCoordFromWorld(Location);
+	return ProjectOntoWalkableNode(Coord);
+}
+
+TWeakPtr<VoxelEngine::Navigation::NavNode> UVoxelNavManagerComponent::ProjectOntoWalkableNode(const FIntVector& Coord) const
+{
+	if (WalkableVoxelNodes.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+
+	if (!VoxelWorld->IsValidCoordinate(Coord))
+	{
+		return nullptr;
+	}
+
+	check(WalkableVoxelNodes.Num() > Coord.X);
+	check(WalkableVoxelNodes[Coord.X].Num() > Coord.Y);
+
+	const auto& NodeColumn = WalkableVoxelNodes[Coord.X][Coord.Y];
+	for (const auto& Node : NodeColumn)
+	{
+		if (Node->Bounds.Min == Coord)
+		{
+			return Node;
+		}
+	}
+
+	return nullptr;
+}
+
+bool UVoxelNavManagerComponent::CheckPathExists(const TWeakPtr<VoxelEngine::Navigation::NavNode>& From, const TWeakPtr<VoxelEngine::Navigation::NavNode>& To, const FVoxelNavQueryParams& Params) const
+{
+	return false;
+}
+
+bool UVoxelNavManagerComponent::CheckPathExists(const FVector& From, const FVector& To, const FVoxelNavQueryParams& Params) const
+{
+	const auto& NodeFrom = ProjectOntoWalkableNode(From);
+	if (!NodeFrom.IsValid())
+	{
+		return false;
+	}
+	const auto& NodeTo = ProjectOntoWalkableNode(To);
+	if (!NodeTo.IsValid())
+	{
+		return false;
+	}
+
+	return CheckPathExists(NodeFrom, NodeTo, Params);
 }
 
 void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -431,7 +486,7 @@ void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinishe
 	{
 		WalkableVoxelNodes[X].SetNum(WorldSizeVoxel.Y);
 	}
-	
+
 	for (int X = 0; X < WorldSizeVoxel.X; X++)
 	{
 		for (int Y = 0; Y < WorldSizeVoxel.Y; Y++)
@@ -487,7 +542,7 @@ void UVoxelNavManagerComponent::DebugDrawNavHierarchy(const FIntVector& Voxel)
 
 	check(WalkableVoxelNodes.Num() > Voxel.X);
 	check(WalkableVoxelNodes[Voxel.X].Num() > Voxel.Y);
-	
+
 	const auto& NodeColumn = WalkableVoxelNodes[Voxel.X][Voxel.Y];
 
 	for (const auto& Node : NodeColumn)
@@ -499,4 +554,3 @@ void UVoxelNavManagerComponent::DebugDrawNavHierarchy(const FIntVector& Voxel)
 		}
 	}
 }
-

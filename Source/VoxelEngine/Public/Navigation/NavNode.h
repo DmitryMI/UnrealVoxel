@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "VoxelEngine/Public/DataStructures/IntBox.h"
-#include "NavLinkPermissions.h"
+#include "VoxelEngine/Public/VoxelNavLinkPermissions.h"
 #include <any>
 
 namespace VoxelEngine::Navigation
@@ -17,11 +17,11 @@ namespace VoxelEngine::Navigation
 		std::any AlgorithmPayload = nullptr;
 
 		NavNode(const FIntBox& Bounds, uint8 Level);
-		void LinkSibling(TWeakPtr<NavNode> Sibling, TArray<ENavLinkPermissions> Permissions);
+		void LinkSibling(TWeakPtr<NavNode> Sibling, TArray<EVoxelNavLinkPermissions> Permissions);
 		void UnlinkSibling(NavNode* Sibling);
 		int32 SiblingsNum() const;
 
-		TPair<TWeakPtr<NavNode>, TArray<ENavLinkPermissions>> GetSiblingLink(int32 Index) const;
+		TPair<TWeakPtr<NavNode>, TArray<EVoxelNavLinkPermissions>> GetSiblingLink(int32 Index) const;
 
 		template<typename T>
 		const T& GetAlgorithmPayload() const
@@ -43,6 +43,6 @@ namespace VoxelEngine::Navigation
 
 	private:
 		TArray<TWeakPtr<NavNode>> Siblings{};
-		TArray<TArray<ENavLinkPermissions>> SiblingsPermissions{};
+		TArray<TArray<EVoxelNavLinkPermissions>> SiblingsPermissions{};
 	};
 }

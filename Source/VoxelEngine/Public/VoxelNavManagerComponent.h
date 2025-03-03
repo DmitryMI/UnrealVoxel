@@ -7,9 +7,19 @@
 #include "VoxelChange.h"
 #include "VoxelEngine/Public/Navigation/NavNode.h"
 #include "VoxelEngine/Public/DataStructures/RStarTree.h"
+#include "VoxelNavLinkPermissions.h"
 #include "VoxelNavManagerComponent.generated.h"
 
 using NavLevelGrid = TArray<TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>>>;
+
+USTRUCT(BlueprintType)
+struct FVoxelNavQueryParams
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	EVoxelNavLinkPermissions NavLinkPermissions;
+};
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class VOXELENGINE_API UVoxelNavManagerComponent : public UActorComponent
@@ -28,6 +38,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void DebugDrawNavHierarchy(const FIntVector& Voxel);
+
+	UFUNCTION(BlueprintCallable)
+	bool CheckPathExists(const FVector& From, const FVector& To, const FVoxelNavQueryParams& Params) const;
 
 protected:
 	// Called when the game starts
@@ -79,4 +92,8 @@ private:
 	FIntBox GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
 
 	void DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int RecursionDirection) const;
+
+	TWeakPtr<VoxelEngine::Navigation::NavNode> ProjectOntoWalkableNode(const FVector& Location) const;
+	TWeakPtr<VoxelEngine::Navigation::NavNode> ProjectOntoWalkableNode(const FIntVector& Coord) const;
+	bool CheckPathExists(const TWeakPtr<VoxelEngine::Navigation::NavNode>& From, const TWeakPtr<VoxelEngine::Navigation::NavNode>& To, const FVoxelNavQueryParams& Params) const;
 };

@@ -9,7 +9,7 @@ namespace VoxelEngine::Navigation
 	{
 	}
 
-	void VoxelEngine::Navigation::NavNode::LinkSibling(TWeakPtr<NavNode> Sibling, TArray<ENavLinkPermissions> Permissions)
+	void VoxelEngine::Navigation::NavNode::LinkSibling(TWeakPtr<NavNode> Sibling, TArray<EVoxelNavLinkPermissions> Permissions)
 	{
 		Siblings.Add(Sibling);
 		SiblingsPermissions.Add(Permissions);
@@ -39,7 +39,7 @@ namespace VoxelEngine::Navigation
 		return Siblings.Num();
 	}
 
-	TPair<TWeakPtr<NavNode>, TArray<ENavLinkPermissions>> NavNode::GetSiblingLink(int32 Index) const
+	TPair<TWeakPtr<NavNode>, TArray<EVoxelNavLinkPermissions>> NavNode::GetSiblingLink(int32 Index) const
 	{
 		return { Siblings[Index], SiblingsPermissions[Index] };
 	}
