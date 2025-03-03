@@ -314,17 +314,29 @@ FIntBox UVoxelNavManagerComponent::GetBoundingBox(const TArray<TSharedPtr<VoxelE
 	return FIntBox(Min, Max);
 }
 
-void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int Level) const
+void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int RecursionDirection) const
 {
-	if (Level > DebugDrawNavNodesLevelMin)
+	if (!Node)
+	{
+		return;
+	}
+
+	if (RecursionDirection < 0 && Node->Level > DebugDrawNavNodesLevelMin)
 	{
 		for (const auto& Child : Node->Children)
 		{
-			DebugDrawNavNode(Child.Get(), Level - 1);
+			DebugDrawNavNode(Child.Get(), RecursionDirection);
+		}
+	}
+	else if (RecursionDirection > 0 && Node->Level < DebugDrawNavNodesLevelMax)
+	{
+		if (Node->Parent.IsValid())
+		{
+			DebugDrawNavNode(Node->Parent.Pin().Get(), RecursionDirection);
 		}
 	}
 
-	if (DebugDrawNavNodesLevelMin > Level || Level > DebugDrawNavNodesLevelMax)
+	if (DebugDrawNavNodesLevelMin > Node->Level || Node->Level > DebugDrawNavNodesLevelMax)
 	{
 		return;
 	}
@@ -336,7 +348,13 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 	FBox NodeBox = Node->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
 	FIntVector NodeCoord = Node->Bounds.Min;
 
-	DrawDebugBox(GetWorld(), NodeBox.GetCenter(), NodeBox.GetExtent(), FColor::Magenta);
+	int32 ColorStep = 255 / NavHierarchyLevelsNum;
+	FColor BoxColor = FColor::Black;
+	BoxColor.R = Node->Level * ColorStep;
+	BoxColor.G = 255 - Node->Level * ColorStep;
+	// BoxColor.R = 100;
+
+	DrawDebugBox(GetWorld(), NodeBox.GetCenter(), NodeBox.GetExtent(), BoxColor);
 
 	for (int I = 0; I < Node->SiblingsNum(); I++)
 	{
@@ -411,8 +429,6 @@ void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinishe
 	check(VoxelWorld);
 	FIntVector WorldSizeVoxel = VoxelWorld->GetWorldSizeVoxel();
 
-	NavLevelGrid WalkableVoxelNodes;
-
 	WalkableVoxelNodes.SetNum(WorldSizeVoxel.X);
 	for (int X = 0; X < WorldSizeVoxel.X; X++)
 	{
@@ -460,5 +476,30 @@ void UVoxelNavManagerComponent::GenerateNavData(const FVoxelNavGenerationFinishe
 
 void UVoxelNavManagerComponent::ChangeVoxel(const FVoxelChange& VoxelChange)
 {
+}
+
+void UVoxelNavManagerComponent::DebugDrawNavHierarchy(const FIntVector& Voxel)
+{
+	AVoxelWorld* VoxelWorld = GetOwner<AVoxelWorld>();
+	check(VoxelWorld);
+
+	if (!VoxelWorld->IsValidCoordinate(Voxel))
+	{
+		return;
+	}
+
+	check(WalkableVoxelNodes.Num() > Voxel.X);
+	check(WalkableVoxelNodes[Voxel.X].Num() > Voxel.Y);
+	
+	const auto& NodeColumn = WalkableVoxelNodes[Voxel.X][Voxel.Y];
+
+	for (const auto& Node : NodeColumn)
+	{
+		if (Node->Bounds.Min == Voxel)
+		{
+			DebugDrawNavNode(Node.Get(), 1);
+			// break;
+		}
+	}
 }
 

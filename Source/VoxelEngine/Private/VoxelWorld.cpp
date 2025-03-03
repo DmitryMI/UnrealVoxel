@@ -155,6 +155,11 @@ void AVoxelWorld::SetWorldGeneratorInstance(UVoxelWorldGenerator* Instance)
 	VoxelWorldGeneratorInstance = Instance;
 }
 
+UVoxelNavManagerComponent* AVoxelWorld::GetVoxelNavManagerB() const
+{
+	return VoxelNavManagerComponent;
+}
+
 // Called when the game starts or when spawned
 void AVoxelWorld::BeginPlay()
 {

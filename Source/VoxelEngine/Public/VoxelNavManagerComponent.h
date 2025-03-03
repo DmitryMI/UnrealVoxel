@@ -26,6 +26,9 @@ public:
 	void GenerateNavData(const FVoxelNavGenerationFinished& Callback);
 	void ChangeVoxel(const FVoxelChange& VoxelChange);
 
+	UFUNCTION(BlueprintCallable)
+	void DebugDrawNavHierarchy(const FIntVector& Voxel);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -52,6 +55,7 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	int32 NavAgentHeight = 2;
 
+	NavLevelGrid WalkableVoxelNodes;
 	NavLevelGrid TopLevelNodes;
 
 	FVoxelNavGenerationFinished GenerationFinishedCallback;
@@ -73,5 +77,5 @@ private:
 	TArray<TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>> GetGraphComponents(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
 	FIntBox GetBoundingBox(const TArray<TSharedPtr<VoxelEngine::Navigation::NavNode>>& Graph) const;
 
-	void DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int Level) const;
+	void DebugDrawNavNode(VoxelEngine::Navigation::NavNode* Node, int RecursionDirection) const;
 };

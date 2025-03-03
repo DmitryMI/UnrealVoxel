@@ -142,6 +142,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetWorldGeneratorInstance(UVoxelWorldGenerator* Instance);
 
+	template<typename T>
+	T* GetVoxelNavManager() const
+	{
+		return Cast<T>(VoxelNavManagerComponent);
+	}
+
+	UFUNCTION(BlueprintCallable)
+	UVoxelNavManagerComponent* GetVoxelNavManagerB() const;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
