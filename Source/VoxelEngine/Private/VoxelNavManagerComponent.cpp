@@ -31,7 +31,7 @@ bool UVoxelNavManagerComponent::IsVoxelWalkable(const FIntVector& Coord, int32 A
 		return false;
 	}
 
-	for (int Z = 1; Z < AgentHeight; Z++)
+	for (int Z = 1; Z <= AgentHeight; Z++)
 	{
 		if (!VoxelWorld->IsVoxelTraversable(Coord + FIntVector(0, 0, Z)))
 		{
@@ -82,24 +82,33 @@ void UVoxelNavManagerComponent::CreateLevelZeroSiblingLinks(VoxelEngine::Navigat
 			if (Z == Coord.Z)
 			{
 				Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::None });
-				LastSolidZ = Z;
-				continue;
 			}
-
-			if (Z > Coord.Z)
+			else if (Z > Coord.Z)
 			{
-				Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpUp });
-				LastSolidZ = Z;
-				continue;
+				bool bHasJumpSpace = true;
+				for(int TestZ = Coord.Z + 1; TestZ <= Z + NavAgentHeight; TestZ++)
+				{ 
+					FIntVector TestCoord = Coord;
+					TestCoord.Z = TestZ;
+					if (!VoxelWorld->IsVoxelTraversable(TestCoord))
+					{
+						bHasJumpSpace = false;
+						break;
+					}
+				}
+				if (bHasJumpSpace)
+				{
+					Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpUp });
+				}
 			}
-
-			if (LastSolidZ - Node->Bounds.Min.Z < NavAgentHeight)
+			else 
 			{
-				LastSolidZ = Z;
-				continue;
+				if (LastSolidZ - Node->Bounds.Min.Z >= NavAgentHeight)
+				{
+					Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpDown });
+				}
 			}
 
-			Node->LinkSibling(OffsetNode, { EVoxelNavLinkPermissions::JumpDown });
 			LastSolidZ = Z;
 		}
 	}
