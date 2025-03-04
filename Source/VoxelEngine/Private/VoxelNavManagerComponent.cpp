@@ -504,6 +504,13 @@ TArray<FBox> UVoxelNavManagerComponent::DebugFindPath(const FVector& From, const
 	Params.NavLinkPermissions = EVoxelNavLinkPermissions::None | EVoxelNavLinkPermissions::JumpUp | EVoxelNavLinkPermissions::JumpDown;
 
 	double VoxelSize = GetOwner<AVoxelWorld>()->GetVoxelSizeWorld();
+	auto Distance = [VoxelSize](VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To) {
+		FVector FromCenter = From->Bounds.ToBox(VoxelSize).GetCenter();
+		FVector ToCenter = To->Bounds.ToBox(VoxelSize).GetCenter();
+		FVector Delta = (ToCenter - FromCenter).GetAbs();
+		double DeltaMahnatten = Delta.X + Delta.Y + Delta.Z;
+		return DeltaMahnatten;
+		};
 	auto Heuristic = [VoxelSize](VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To) {
 		return (From->Bounds.ToBox(VoxelSize).GetCenter() - To->Bounds.ToBox(VoxelSize).GetCenter()).Size();
 		};
@@ -524,7 +531,7 @@ TArray<FBox> UVoxelNavManagerComponent::DebugFindPath(const FVector& From, const
 		OutVisitedNodes.Add(NodeBox);
 		OutVisitedNodesFlags.Add(bIsFromOpenSet);
 		};
-	VoxelEngine::Navigation::AStar AStar(Heuristic, Traversability, Visit);
+	VoxelEngine::Navigation::AStar AStar(Distance, Heuristic, Traversability, Visit);
 
 	TArray<FBox> PathResult;
 	auto PathList = AStar.FindPath(NodeFrom.Pin().Get(), NodeTo.Pin().Get());

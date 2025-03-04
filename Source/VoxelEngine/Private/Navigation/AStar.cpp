@@ -4,10 +4,12 @@ namespace VoxelEngine::Navigation
 {
 
 	VoxelEngine::Navigation::AStar::AStar(
+		const DistanceFunction& Distance,
 		const HeuristicFunction& Heuristic,
 		const TraversabilityFunction& Traversability,
 		const VisitFunction& Visit
 	) :
+		Distance(Distance),
 		Heuristic(Heuristic),
 		Traversability(Traversability),
 		Visit(Visit)
@@ -36,6 +38,7 @@ namespace VoxelEngine::Navigation
 
 		OpenSet.push(From);
 		GetPayload(From).bIsInOpenSet = true;
+
 		while (!OpenSet.empty())
 		{
 			NavNode* Current = OpenSet.top();
@@ -63,12 +66,13 @@ namespace VoxelEngine::Navigation
 
 				if (Visit)
 				{
-					Visit(Current, false);
+					Visit(Sibling, false); 
 				}
 				
+				double DistanceToSibling = Distance(Current, Sibling);
 				double SiblingHeuristic = Heuristic(Sibling, To);
 
-				double TentativeGCost = GetPayload(Current).GScore + SiblingHeuristic;
+				double TentativeGCost = GetPayload(Current).GScore + DistanceToSibling;
 				CreatePayload(Sibling);
 				
 				if (TentativeGCost < GetPayload(Sibling).GScore)
@@ -79,6 +83,7 @@ namespace VoxelEngine::Navigation
 					if (!GetPayload(Sibling).bIsInOpenSet)
 					{
 						OpenSet.push(Sibling);
+						GetPayload(From).bIsInOpenSet = true;
 					}
 				}
 			}

@@ -8,6 +8,7 @@ namespace VoxelEngine::Navigation
 {
 	using TraversabilityFunction = std::function<bool(VoxelEngine::Navigation::NavNode* From, int)>;
 	using HeuristicFunction = std::function<double(VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To)>;
+	using DistanceFunction = std::function<double(VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To)>;
 	using VisitFunction = std::function<void(VoxelEngine::Navigation::NavNode* Node, bool)>;
 
 	struct FAStarNodePayload
@@ -44,6 +45,7 @@ namespace VoxelEngine::Navigation
 	{
 	public:
 		AStar(
+			const DistanceFunction& Distance,
 			const HeuristicFunction& Heuristic,
 			const TraversabilityFunction& Traversability,
 			const VisitFunction& Visit = nullptr
@@ -62,7 +64,7 @@ namespace VoxelEngine::Navigation
 			}
 		};
 
-
+		DistanceFunction Distance;
 		HeuristicFunction Heuristic;
 		TraversabilityFunction Traversability;
 		VisitFunction Visit;
