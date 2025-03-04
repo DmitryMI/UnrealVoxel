@@ -24,8 +24,14 @@ constexpr EVoxelNavLinkPermissions operator&(EVoxelNavLinkPermissions A, EVoxelN
 	return static_cast<EVoxelNavLinkPermissions>(Result);
 }
 
-constexpr bool HasFlags(EVoxelNavLinkPermissions Mix, EVoxelNavLinkPermissions Mask)
+constexpr bool NavLinkPermissionsHasAllFlags(EVoxelNavLinkPermissions Mix, EVoxelNavLinkPermissions Mask)
 {
 	EVoxelNavLinkPermissions Combined = Mix & Mask;
 	return Combined == Mask;
+}
+
+constexpr bool NavLinkPermissionsHasAnyFlag(EVoxelNavLinkPermissions Mix, EVoxelNavLinkPermissions Mask)
+{
+	EVoxelNavLinkPermissions Combined = Mix & Mask;
+	return Combined != static_cast<EVoxelNavLinkPermissions>(0);
 }

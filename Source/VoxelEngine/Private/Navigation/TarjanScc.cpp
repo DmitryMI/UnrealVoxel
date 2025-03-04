@@ -10,7 +10,7 @@ namespace VoxelEngine::Navigation
 	{
 		for (auto& Node : Graph)
 		{
-			Node->AlgorithmPayload = FTarjanSccNodePayload();
+			Node->SetAlgorithmPayload(FTarjanSccNodePayload());
 		}
 	}
 
@@ -18,7 +18,7 @@ namespace VoxelEngine::Navigation
 	{
 		for (auto& Node : Graph)
 		{
-			Node->AlgorithmPayload = nullptr;
+			Node->ClearAlgorithmPayload();
 		}
 	}
 

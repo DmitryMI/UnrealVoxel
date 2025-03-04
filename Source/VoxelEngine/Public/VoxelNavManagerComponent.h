@@ -42,6 +42,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool CheckPathExists(const FVector& From, const FVector& To, const FVoxelNavQueryParams& Params) const;
 
+	UFUNCTION(BlueprintCallable)
+	TArray<FBox> DebugFindPath(const FVector& From, const FVector& To, TArray<FBox>& OutVisitedNodes, TArray<bool>& OutVisitedNodesFlags);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -95,5 +98,17 @@ private:
 
 	TWeakPtr<VoxelEngine::Navigation::NavNode> ProjectOntoWalkableNode(const FVector& Location) const;
 	TWeakPtr<VoxelEngine::Navigation::NavNode> ProjectOntoWalkableNode(const FIntVector& Coord) const;
-	bool CheckPathExists(const TWeakPtr<VoxelEngine::Navigation::NavNode>& From, const TWeakPtr<VoxelEngine::Navigation::NavNode>& To, const FVoxelNavQueryParams& Params) const;
+	bool CheckPathExists(VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To, const FVoxelNavQueryParams& Params) const;
+
+	/// <summary>
+	/// <para>Tries to find common parent with the lowest level.</para>
+	/// <para>OutParentA and OutParentB will point to top level parents if common parent could not be found.</para>
+	/// <para>OutParentA and OutParentB will point to the same common parent if it was found.</para>
+	/// </summary>
+	/// <param name="NodeA">Starting node A</param>
+	/// <param name="NodeB">Starting node B</param>
+	/// <param name="OutParentA">Closest parent of A</param>
+	/// <param name="OutParentB">Closest parent of B</param>
+	/// <returns>True if OutParentA and OutParentB point to the same node (common parent was found)</returns>
+	bool GetClosestCommonParent(VoxelEngine::Navigation::NavNode* NodeA, VoxelEngine::Navigation::NavNode* NodeB, VoxelEngine::Navigation::NavNode*& OutParentA, VoxelEngine::Navigation::NavNode*& OutParentB) const;
 };

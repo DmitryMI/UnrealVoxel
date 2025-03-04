@@ -5,6 +5,8 @@
 #include "DrawDebugHelpers.h"
 #include "VoxelQueryUtils.h"
 #include "VoxelEngine/Public/Navigation/TarjanScc.h"
+#include "VoxelEngine/Public/Navigation/AStar.h"
+#include "VoxelEngine/Public/VoxelNavLinkPermissions.h"
 
 // Sets default values for this component's properties
 UVoxelNavManagerComponent::UVoxelNavManagerComponent()
@@ -376,11 +378,11 @@ void UVoxelNavManagerComponent::DebugDrawNavNode(VoxelEngine::Navigation::NavNod
 		{
 			FVector ArrowVerticalOffset = FVector{ 0, 0, VoxelSize * 0.1 * LinkIndex };
 			FColor LineColor = FColor::Blue;
-			if (HasFlags(LinkRule, EVoxelNavLinkPermissions::JumpUp))
+			if (NavLinkPermissionsHasAllFlags(LinkRule, EVoxelNavLinkPermissions::JumpUp))
 			{
 				LineColor = FColor::Green;
 			}
-			else if (HasFlags(LinkRule, EVoxelNavLinkPermissions::JumpDown))
+			else if (NavLinkPermissionsHasAllFlags(LinkRule, EVoxelNavLinkPermissions::JumpDown))
 			{
 				LineColor = FColor::Red;
 			}
@@ -419,7 +421,7 @@ TWeakPtr<VoxelEngine::Navigation::NavNode> UVoxelNavManagerComponent::ProjectOnt
 	const auto& NodeColumn = WalkableVoxelNodes[Coord.X][Coord.Y];
 	for (const auto& Node : NodeColumn)
 	{
-		if (Node->Bounds.Min == Coord)
+		if (Node->Bounds.Min.X == Coord.X && Node->Bounds.Min.Y == Coord.Y && Node->Bounds.Min.Z <= Coord.Z)
 		{
 			return Node;
 		}
@@ -428,8 +430,44 @@ TWeakPtr<VoxelEngine::Navigation::NavNode> UVoxelNavManagerComponent::ProjectOnt
 	return nullptr;
 }
 
-bool UVoxelNavManagerComponent::CheckPathExists(const TWeakPtr<VoxelEngine::Navigation::NavNode>& From, const TWeakPtr<VoxelEngine::Navigation::NavNode>& To, const FVoxelNavQueryParams& Params) const
+bool UVoxelNavManagerComponent::CheckPathExists(VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To, const FVoxelNavQueryParams& Params) const
 {
+	VoxelEngine::Navigation::NavNode* FromParent;
+	VoxelEngine::Navigation::NavNode* ToParent;
+	if (GetClosestCommonParent(From, To, FromParent, ToParent))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool UVoxelNavManagerComponent::GetClosestCommonParent(VoxelEngine::Navigation::NavNode* NodeA, VoxelEngine::Navigation::NavNode* NodeB, VoxelEngine::Navigation::NavNode*& OutParentA, VoxelEngine::Navigation::NavNode*& OutParentB) const
+{
+	OutParentA = nullptr;
+	OutParentB = nullptr;
+	if (!NodeA || !NodeB)
+	{
+		return false;
+	}
+
+	while (NodeA->Parent.IsValid() && NodeB->Parent.IsValid() && NodeA != NodeB)
+	{
+		NodeA = NodeA->Parent.Pin().Get();
+		NodeB = NodeB->Parent.Pin().Get();
+	}
+
+	check(NodeA);
+	check(NodeB);
+	check(NodeA->Parent.IsValid() == NodeB->Parent.IsValid());
+
+	if (NodeA == NodeB)
+	{
+		OutParentA = NodeA;
+		OutParentB = NodeB;
+		return true;
+	}
+
 	return false;
 }
 
@@ -446,7 +484,63 @@ bool UVoxelNavManagerComponent::CheckPathExists(const FVector& From, const FVect
 		return false;
 	}
 
-	return CheckPathExists(NodeFrom, NodeTo, Params);
+	return CheckPathExists(NodeFrom.Pin().Get(), NodeTo.Pin().Get(), Params);
+}
+
+TArray<FBox> UVoxelNavManagerComponent::DebugFindPath(const FVector& From, const FVector& To, TArray<FBox>& OutVisitedNodes, TArray<bool>& OutVisitedNodesFlags)
+{
+	const auto& NodeFrom = ProjectOntoWalkableNode(From);
+	if (!NodeFrom.IsValid())
+	{
+		return TArray<FBox>();
+	}
+	const auto& NodeTo = ProjectOntoWalkableNode(To);
+	if (!NodeTo.IsValid())
+	{
+		return TArray<FBox>();
+	}
+
+	FVoxelNavQueryParams Params;
+	Params.NavLinkPermissions = EVoxelNavLinkPermissions::None | EVoxelNavLinkPermissions::JumpUp | EVoxelNavLinkPermissions::JumpDown;
+
+	double VoxelSize = GetOwner<AVoxelWorld>()->GetVoxelSizeWorld();
+	auto Heuristic = [VoxelSize](VoxelEngine::Navigation::NavNode* From, VoxelEngine::Navigation::NavNode* To) {
+		return (From->Bounds.ToBox(VoxelSize).GetCenter() - To->Bounds.ToBox(VoxelSize).GetCenter()).Size();
+		};
+	auto Traversability = [Params](VoxelEngine::Navigation::NavNode* From, int LinkIndex) {
+		auto LinkRules = From->GetSiblingLink(LinkIndex).Value;
+		for (const auto& LinkRule : LinkRules)
+		{
+			if (LinkRule == EVoxelNavLinkPermissions::None || NavLinkPermissionsHasAnyFlag(LinkRule, Params.NavLinkPermissions))
+			{
+				return true;
+			}
+		}
+		return false;
+		};
+
+	auto Visit = [&](VoxelEngine::Navigation::NavNode* Node, bool bIsFromOpenSet) {
+		FBox NodeBox = Node->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize);
+		OutVisitedNodes.Add(NodeBox);
+		OutVisitedNodesFlags.Add(bIsFromOpenSet);
+		};
+	VoxelEngine::Navigation::AStar AStar(Heuristic, Traversability, Visit);
+
+	TArray<FBox> PathResult;
+	auto PathList = AStar.FindPath(NodeFrom.Pin().Get(), NodeTo.Pin().Get());
+	if (!PathList)
+	{
+		return PathResult;
+	}
+	
+	PathResult.Reserve(PathList->Num());
+
+	for (TDoubleLinkedList<VoxelEngine::Navigation::NavNode*>::TIterator It(PathList->GetHead()); It; ++It)
+	{
+		PathResult.Add(It->Bounds.ToBox(VoxelSize).ShiftBy(FVector::UpVector * VoxelSize));
+	}
+
+	return PathResult;
 }
 
 void UVoxelNavManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
